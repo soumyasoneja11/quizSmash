@@ -1,79 +1,117 @@
-const { Pool } = require('pg');
-require('dotenv').config();
+const fs = require("fs");
+const path = require("path");
+const sqlite3 = require("sqlite3").verbose();
+require("dotenv").config();
 
-const pool = new Pool({
-  user: process.env.DB_USER || 'postgres',
-  host: process.env.DB_HOST || 'localhost',
-  database: process.env.DB_NAME || 'quizsmash',
-  password: process.env.DB_PASSWORD || 'password',
-  port: process.env.DB_PORT || 5432,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false
-});
+const dbPath =
+  process.env.SQLITE_PATH ||
+  path.join(__dirname, "..", "data", "quizsmash.sqlite");
 
-// Test connection
-pool.connect((err, client, release) => {
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
-    console.error('❌ Database connection error:', err.stack);
+    console.error("❌ SQLite connection error:", err.message);
   } else {
-    console.log('✅ Connected to PostgreSQL database');
-    release();
+    console.log("✅ Connected to SQLite database");
   }
 });
 
-// Initialize database schema
+db.serialize(() => {
+  db.run("PRAGMA foreign_keys = ON");
+});
+
+function run(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) return reject(err);
+      resolve({ lastID: this.lastID, changes: this.changes });
+    });
+  });
+}
+
+function get(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => {
+      if (err) return reject(err);
+      resolve(row);
+    });
+  });
+}
+
+function all(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows);
+    });
+  });
+}
+
 async function initializeDatabase() {
   try {
-    // Create tables if they don't exist
-    await pool.query(`
+    await run("PRAGMA foreign_keys = ON");
+    await run(`
       CREATE TABLE IF NOT EXISTS rooms (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        code VARCHAR(6) UNIQUE NOT NULL,
-        host_socket_id VARCHAR(100),
-        topic VARCHAR(100),
-        difficulty VARCHAR(20) DEFAULT 'medium',
-        status VARCHAR(20) DEFAULT 'waiting',
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE NOT NULL,
+        host_socket_id TEXT,
+        topic TEXT,
+        difficulty TEXT DEFAULT 'medium',
+        status TEXT DEFAULT 'waiting',
         current_question INTEGER DEFAULT 0,
         total_questions INTEGER DEFAULT 3,
-        created_at TIMESTAMP DEFAULT NOW(),
-        expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '1 hour'
-      );
-
-      CREATE TABLE IF NOT EXISTS players (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-        username VARCHAR(50) NOT NULL,
-        socket_id VARCHAR(100) NOT NULL,
-        score INTEGER DEFAULT 0,
-        is_ready BOOLEAN DEFAULT false,
-        joined_at TIMESTAMP DEFAULT NOW(),
-        UNIQUE(room_id, username)
-      );
-
-      CREATE TABLE IF NOT EXISTS questions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
-        question_text TEXT NOT NULL,
-        options JSONB NOT NULL,
-        correct_index INTEGER NOT NULL,
-        round_number INTEGER NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-
-      CREATE TABLE IF NOT EXISTS answers (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        player_id UUID REFERENCES players(id) ON DELETE CASCADE,
-        question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
-        selected_index INTEGER,
-        is_correct BOOLEAN,
-        answered_at TIMESTAMP DEFAULT NOW()
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME DEFAULT (datetime('now', '+1 hour'))
       );
     `);
-    console.log('✅ Database schema initialized');
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS players (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+        username TEXT NOT NULL,
+        socket_id TEXT NOT NULL,
+        score INTEGER DEFAULT 0,
+        is_ready INTEGER DEFAULT 0,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(room_id, username)
+      );
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+        question_text TEXT NOT NULL,
+        options TEXT NOT NULL,
+        correct_index INTEGER NOT NULL,
+        explanation TEXT,
+        round_number INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await run(`
+      CREATE TABLE IF NOT EXISTS answers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
+        question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+        selected_index INTEGER,
+        is_correct INTEGER,
+        answered_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("✅ Database schema initialized");
   } catch (error) {
-    console.error('❌ Database initialization error:', error);
+    console.error("❌ Database initialization error:", error);
   }
 }
 
 initializeDatabase();
 
-module.exports = { pool };
+module.exports = { db, run, get, all };

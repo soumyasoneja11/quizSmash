@@ -3,7 +3,7 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const { setupSocketHandlers } = require("./socket");
-const { pool } = require("./database");
+const { all } = require("./database");
 
 require("dotenv").config();
 
@@ -27,7 +27,7 @@ app.get("/api/health", (req, res) => {
 // Get active rooms
 app.get("/api/rooms", async (req, res) => {
   try {
-    const result = await pool.query(`
+    const rooms = await all(`
       SELECT 
         r.id, 
         r.code, 
@@ -42,7 +42,7 @@ app.get("/api/rooms", async (req, res) => {
       GROUP BY r.id, r.code, r.topic, r.difficulty, r.status, r.created_at
       ORDER BY r.created_at DESC
     `);
-    res.json(result.rows);
+    res.json(rooms);
   } catch (error) {
     console.error("Error fetching rooms:", error);
     res.status(500).json({ error: "Failed to fetch rooms" });
@@ -52,7 +52,7 @@ app.get("/api/rooms", async (req, res) => {
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "http://localhost:5173",
     methods: ["GET", "POST"],
   },
   connectionStateRecovery: {

@@ -1,6 +1,5 @@
 const { generateQuiz } = require("./openai");
-const { pool } = require("./database");
-const crypto = require("crypto");
+const { run, get, all } = require("./database");
 
 function generateRoomCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -11,222 +10,238 @@ function generateRoomCode() {
   return code;
 }
 
+function normalizeOptions(options) {
+  if (Array.isArray(options)) return options;
+  if (typeof options === "string") {
+    try {
+      return JSON.parse(options);
+    } catch (error) {
+      return [];
+    }
+  }
+  return [];
+}
+
 async function createRoom(hostSocketId, username) {
-  const client = await pool.connect();
   try {
     const roomCode = generateRoomCode();
 
-    await client.query("BEGIN");
+    await run("BEGIN");
 
     // Create room
-    const roomResult = await client.query(
-      "INSERT INTO rooms (code, host_socket_id) VALUES ($1, $2) RETURNING *",
+    const roomInsert = await run(
+      "INSERT INTO rooms (code, host_socket_id) VALUES (?, ?)",
       [roomCode, hostSocketId],
     );
 
     // Add host as player
-    const playerResult = await client.query(
-      "INSERT INTO players (room_id, username, socket_id) VALUES ($1, $2, $3) RETURNING *",
-      [roomResult.rows[0].id, username, hostSocketId],
+    const playerInsert = await run(
+      "INSERT INTO players (room_id, username, socket_id) VALUES (?, ?, ?)",
+      [roomInsert.lastID, username, hostSocketId],
     );
 
-    await client.query("COMMIT");
+    const room = await get("SELECT * FROM rooms WHERE id = ?", [
+      roomInsert.lastID,
+    ]);
+    const player = await get("SELECT * FROM players WHERE id = ?", [
+      playerInsert.lastID,
+    ]);
+
+    await run("COMMIT");
 
     return {
-      room: roomResult.rows[0],
-      player: playerResult.rows[0],
+      room,
+      player,
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    await run("ROLLBACK");
     throw error;
-  } finally {
-    client.release();
   }
 }
 
 async function joinRoom(roomCode, username, socketId) {
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await run("BEGIN");
 
     // Get room
-    const roomResult = await client.query(
-      "SELECT * FROM rooms WHERE code = $1 AND status = $2",
+    const room = await get(
+      "SELECT * FROM rooms WHERE code = ? AND status = ?",
       [roomCode, "waiting"],
     );
 
-    if (roomResult.rows.length === 0) {
+    if (!room) {
       throw new Error("Room not found or already started");
     }
 
-    const room = roomResult.rows[0];
-
     // Check player count
-    const playerCountResult = await client.query(
-      "SELECT COUNT(*) FROM players WHERE room_id = $1",
+    const playerCountResult = await get(
+      "SELECT COUNT(*) as count FROM players WHERE room_id = ?",
       [room.id],
     );
 
-    if (parseInt(playerCountResult.rows[0].count) >= 4) {
+    if (parseInt(playerCountResult.count, 10) >= 4) {
       throw new Error("Room is full");
     }
 
     // Check if username already exists in room
-    const existingPlayer = await client.query(
-      "SELECT * FROM players WHERE room_id = $1 AND username = $2",
+    const existingPlayer = await get(
+      "SELECT * FROM players WHERE room_id = ? AND username = ?",
       [room.id, username],
     );
 
-    if (existingPlayer.rows.length > 0) {
+    if (existingPlayer) {
       throw new Error("Username already taken in this room");
     }
 
     // Add player
-    const playerResult = await client.query(
-      "INSERT INTO players (room_id, username, socket_id) VALUES ($1, $2, $3) RETURNING *",
+    const playerInsert = await run(
+      "INSERT INTO players (room_id, username, socket_id) VALUES (?, ?, ?)",
       [room.id, username, socketId],
     );
 
+    const player = await get("SELECT * FROM players WHERE id = ?", [
+      playerInsert.lastID,
+    ]);
+
     // Get all players in room
-    const playersResult = await client.query(
-      "SELECT id, username, score, is_ready FROM players WHERE room_id = $1 ORDER BY joined_at",
+    const players = await all(
+      "SELECT id, username, score, is_ready FROM players WHERE room_id = ? ORDER BY joined_at",
       [room.id],
     );
 
-    await client.query("COMMIT");
+    await run("COMMIT");
 
     return {
       room,
-      player: playerResult.rows[0],
-      players: playersResult.rows,
+      player,
+      players,
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    await run("ROLLBACK");
     throw error;
-  } finally {
-    client.release();
   }
 }
 
 async function startGame(roomCode, topic, difficulty) {
-  const client = await pool.connect();
   try {
-    await client.query("BEGIN");
+    await run("BEGIN");
 
     // Update room status and topic
-    await client.query(
-      "UPDATE rooms SET status = $1, topic = $2, difficulty = $3 WHERE code = $4 RETURNING *",
+    await run(
+      "UPDATE rooms SET status = ?, topic = ?, difficulty = ? WHERE code = ?",
       ["active", topic, difficulty, roomCode],
     );
 
     // Generate quiz questions
     const questions = await generateQuiz(topic, difficulty, 3);
 
+    const room = await get("SELECT * FROM rooms WHERE code = ?", [
+      roomCode,
+    ]);
+
     // Save questions to database
     for (let i = 0; i < questions.length; i++) {
-      await client.query(
-        "INSERT INTO questions (room_id, question_text, options, correct_index, round_number) " +
-          "SELECT id, $1, $2, $3, $4 FROM rooms WHERE code = $5",
+      await run(
+        "INSERT INTO questions (room_id, question_text, options, correct_index, explanation, round_number) VALUES (?, ?, ?, ?, ?, ?)",
         [
+          room.id,
           questions[i].question,
           JSON.stringify(questions[i].options),
           questions[i].correctIndex,
+          questions[i].explanation || "Great question!",
           i + 1,
-          roomCode,
         ],
       );
     }
 
-    // Get room with players
-    const roomResult = await client.query(
-      "SELECT * FROM rooms WHERE code = $1",
-      [roomCode],
+    const players = await all(
+      "SELECT id, username, socket_id, score FROM players WHERE room_id = ?",
+      [room.id],
     );
 
-    const playersResult = await client.query(
-      "SELECT id, username, socket_id, score FROM players WHERE room_id = $1",
-      [roomResult.rows[0].id],
+    const questionsResult = await all(
+      "SELECT * FROM questions WHERE room_id = ? ORDER BY round_number",
+      [room.id],
     );
 
-    const questionsResult = await client.query(
-      "SELECT * FROM questions WHERE room_id = $1 ORDER BY round_number",
-      [roomResult.rows[0].id],
-    );
-
-    await client.query("COMMIT");
+    await run("COMMIT");
 
     return {
-      room: roomResult.rows[0],
-      players: playersResult.rows,
-      questions: questionsResult.rows,
+      room,
+      players,
+      questions: questionsResult,
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    await run("ROLLBACK");
     throw error;
-  } finally {
-    client.release();
   }
 }
 
-async function submitAnswer(roomCode, playerId, questionId, answerIndex) {
-  const client = await pool.connect();
+async function submitAnswer(roomCode, playerId, questionId, answerIndex, timeRemaining = 0, speedBonus = false) {
   try {
-    await client.query("BEGIN");
+    await run("BEGIN");
 
     // Get question
-    const questionResult = await client.query(
-      "SELECT * FROM questions WHERE id = $1",
-      [questionId],
-    );
+    const question = await get("SELECT * FROM questions WHERE id = ?", [
+      questionId,
+    ]);
 
-    if (questionResult.rows.length === 0) {
+    if (!question) {
       throw new Error("Question not found");
     }
 
-    const question = questionResult.rows[0];
-    const isCorrect = answerIndex === question.correct_index;
+    const isCorrect = answerIndex !== null && answerIndex === question.correct_index;
 
     // Save answer
-    const answerResult = await client.query(
-      "INSERT INTO answers (player_id, question_id, selected_index, is_correct) " +
-        "VALUES ($1, $2, $3, $4) RETURNING *",
-      [playerId, questionId, answerIndex, isCorrect],
+    await run(
+      "INSERT INTO answers (player_id, question_id, selected_index, is_correct) VALUES (?, ?, ?, ?)",
+      [playerId, questionId, answerIndex !== null ? answerIndex : -1, isCorrect ? 1 : 0],
     );
 
-    // Update player score if correct
+    // Calculate points
+    let pointsEarned = 0;
     if (isCorrect) {
-      await client.query(
-        "UPDATE players SET score = score + 10 WHERE id = $1 RETURNING score",
-        [playerId],
-      );
+      const basePoints = 100;
+      pointsEarned = basePoints;
+      
+      // Add speed bonus if answered quickly (in first 50% of time)
+      if (speedBonus && timeRemaining > 0) {
+        const speedBonusPoints = Math.round(50 * (timeRemaining / 20)); // 20s is default QUESTION_TIME
+        pointsEarned += speedBonusPoints;
+      }
+      
+      await run("UPDATE players SET score = score + ? WHERE id = ?", [
+        pointsEarned,
+        playerId,
+      ]);
     }
 
     // Get updated player info
-    const playerResult = await client.query(
-      "SELECT username, score FROM players WHERE id = $1",
+    const player = await get(
+      "SELECT username, score FROM players WHERE id = ?",
       [playerId],
     );
 
     // Get room scores
-    const scoresResult = await client.query(
+    const scores = await all(
       "SELECT p.username, p.score FROM players p " +
-        "JOIN rooms r ON p.room_id = r.id WHERE r.code = $1 ORDER BY p.score DESC",
+        "JOIN rooms r ON p.room_id = r.id WHERE r.code = ? ORDER BY p.score DESC",
       [roomCode],
     );
 
-    await client.query("COMMIT");
+    await run("COMMIT");
 
     return {
       isCorrect,
       correctAnswer: question.correct_index,
-      player: playerResult.rows[0],
-      scores: scoresResult.rows,
+      player,
+      scores,
+      pointsEarned,
+      speedBonus: isCorrect && speedBonus,
     };
   } catch (error) {
-    await client.query("ROLLBACK");
+    await run("ROLLBACK");
     throw error;
-  } finally {
-    client.release();
   }
 }
 
@@ -303,7 +318,8 @@ function setupSocketHandlers(io) {
           firstQuestion: {
             id: firstQuestion.id,
             question: firstQuestion.question_text,
-            options: firstQuestion.options,
+            options: normalizeOptions(firstQuestion.options),
+            explanation: firstQuestion.explanation,
             round: 1,
           },
           players,
@@ -319,13 +335,15 @@ function setupSocketHandlers(io) {
     // Player submits answer
     socket.on(
       "submit-answer",
-      async ({ roomCode, playerId, questionId, answerIndex }) => {
+      async ({ roomCode, playerId, questionId, answerIndex, timeRemaining, speedBonus }) => {
         try {
           const result = await submitAnswer(
             roomCode,
             playerId,
             questionId,
             answerIndex,
+            timeRemaining,
+            speedBonus,
           );
 
           // Send feedback to the player
@@ -333,6 +351,8 @@ function setupSocketHandlers(io) {
             isCorrect: result.isCorrect,
             correctAnswer: result.correctAnswer,
             playerScore: result.player.score,
+            pointsEarned: result.pointsEarned,
+            speedBonus: result.speedBonus,
           });
 
           // Update scores for all players
@@ -340,7 +360,7 @@ function setupSocketHandlers(io) {
             scores: result.scores,
           });
 
-          console.log(`📝 Answer submitted by player ${playerId}`);
+          console.log(`📝 Answer submitted by player ${playerId} - Correct: ${result.isCorrect} - Points: ${result.pointsEarned}`);
         } catch (error) {
           socket.emit("error", { message: error.message });
           console.error("Submit answer error:", error);
@@ -351,40 +371,40 @@ function setupSocketHandlers(io) {
     // Next question
     socket.on("next-question", async ({ roomCode, currentRound }) => {
       try {
-        const roomResult = await pool.query(
-          "SELECT * FROM rooms WHERE code = $1",
-          [roomCode],
+        const room = await get("SELECT * FROM rooms WHERE code = ?", [
+          roomCode,
+        ]);
+
+        const questionsResult = await get(
+          "SELECT * FROM questions WHERE room_id = ? AND round_number = ?",
+          [room.id, currentRound + 1],
         );
 
-        const questionsResult = await pool.query(
-          "SELECT * FROM questions WHERE room_id = $1 AND round_number = $2",
-          [roomResult.rows[0].id, currentRound + 1],
-        );
-
-        if (questionsResult.rows.length > 0) {
-          const question = questionsResult.rows[0];
+        if (questionsResult) {
+          const question = questionsResult;
           io.to(roomCode).emit("next-question", {
             id: question.id,
             question: question.question_text,
-            options: question.options,
+            options: normalizeOptions(question.options),
+            explanation: question.explanation,
             round: currentRound + 1,
           });
         } else {
           // Game completed
-          const scoresResult = await pool.query(
+          const scoresResult = await all(
             "SELECT p.username, p.score FROM players p " +
-              "JOIN rooms r ON p.room_id = r.id WHERE r.code = $1 ORDER BY p.score DESC",
+              "JOIN rooms r ON p.room_id = r.id WHERE r.code = ? ORDER BY p.score DESC",
             [roomCode],
           );
 
           // Update room status
-          await pool.query("UPDATE rooms SET status = $1 WHERE code = $2", [
+          await run("UPDATE rooms SET status = ? WHERE code = ?", [
             "completed",
             roomCode,
           ]);
 
           io.to(roomCode).emit("game-completed", {
-            leaderboard: scoresResult.rows,
+            leaderboard: scoresResult,
           });
         }
       } catch (error) {
@@ -396,18 +416,19 @@ function setupSocketHandlers(io) {
     // Player ready status
     socket.on("player-ready", async ({ roomCode, playerId }) => {
       try {
-        await pool.query("UPDATE players SET is_ready = true WHERE id = $1", [
-          playerId,
-        ]);
+        await run("UPDATE players SET is_ready = 1 WHERE id = ?", [playerId]);
 
         // Check if all players are ready
-        const playersResult = await pool.query(
-          "SELECT COUNT(*) as total, SUM(CASE WHEN is_ready THEN 1 ELSE 0 END) as ready_count " +
-            "FROM players p JOIN rooms r ON p.room_id = r.id WHERE r.code = $1",
+        const playersResult = await get(
+          "SELECT COUNT(*) as total, SUM(CASE WHEN is_ready = 1 THEN 1 ELSE 0 END) as ready_count " +
+            "FROM players p JOIN rooms r ON p.room_id = r.id WHERE r.code = ?",
           [roomCode],
         );
 
-        const { total, ready_count } = playersResult.rows[0];
+        const { total, ready_count } = playersResult || {
+          total: 0,
+          ready_count: 0,
+        };
 
         if (parseInt(ready_count) === parseInt(total)) {
           io.to(roomCode).emit("all-players-ready");
@@ -422,10 +443,40 @@ function setupSocketHandlers(io) {
       console.log(`🔌 Disconnected: ${socket.id}`);
 
       try {
-        // Remove player from database
-        await pool.query("DELETE FROM players WHERE socket_id = $1", [
-          socket.id,
+        const player = await get(
+          "SELECT id, room_id FROM players WHERE socket_id = ?",
+          [socket.id],
+        );
+
+        if (!player) return;
+
+        const room = await get("SELECT id, code FROM rooms WHERE id = ?", [
+          player.room_id,
         ]);
+
+        // Remove player from database
+        await run("DELETE FROM players WHERE id = ?", [player.id]);
+
+        // Check if room is empty
+        const remaining = await get(
+          "SELECT COUNT(*) as count FROM players WHERE room_id = ?",
+          [player.room_id],
+        );
+
+        if (remaining && parseInt(remaining.count, 10) === 0) {
+          await run("DELETE FROM rooms WHERE id = ?", [player.room_id]);
+          if (room?.code) {
+            io.to(room.code).emit("room-closed", {
+              message: "Room closed due to inactivity",
+            });
+          }
+        } else if (room?.code) {
+          const players = await all(
+            "SELECT id, username, score, is_ready FROM players WHERE room_id = ? ORDER BY joined_at",
+            [player.room_id],
+          );
+          io.to(room.code).emit("player-left", { players });
+        }
       } catch (error) {
         console.error("Disconnect cleanup error:", error);
       }

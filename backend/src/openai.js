@@ -16,19 +16,21 @@ async function generateQuiz(topic, difficulty = 'medium', numQuestions = 3) {
       {
         "question": "The question text here",
         "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-        "correctIndex": 0
+        "correctIndex": 0,
+        "explanation": "A brief explanation of why this answer is correct and interesting facts"
       }
     ]
     
     The correctIndex should be 0, 1, 2, or 3 corresponding to the correct option.
-    Make the questions engaging and the options challenging.`;
+    Make the questions engaging, the options challenging, and the explanations educational.
+    Explanations should be 1-2 sentences, informative and interesting.`;
     
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a quiz master. Generate fun, engaging quiz questions."
+          content: "You are a quiz master. Generate fun, engaging quiz questions with educational explanations."
         },
         {
           role: "user",
@@ -36,7 +38,7 @@ async function generateQuiz(topic, difficulty = 'medium', numQuestions = 3) {
         }
       ],
       temperature: 0.7,
-      max_tokens: 1500,
+      max_tokens: 2000,
     });
     
     const content = response.choices[0].message.content;
@@ -67,7 +69,8 @@ function getFallbackQuestions(topic, numQuestions) {
         "It's found everywhere",
         "It's very rare"
       ],
-      correctIndex: 1
+      correctIndex: 1,
+      explanation: `${topic} is known for its unique and distinctive properties that make it stand out in its category.`
     },
     {
       question: `How does ${topic} typically work?`,
@@ -77,7 +80,8 @@ function getFallbackQuestions(topic, numQuestions) {
         "Using advanced technology",
         "With human intervention"
       ],
-      correctIndex: 0
+      correctIndex: 0,
+      explanation: `Most aspects of ${topic} involve complex systems and detailed processes that have evolved over time.`
     },
     {
       question: `Why is ${topic} important?`,
@@ -87,7 +91,8 @@ function getFallbackQuestions(topic, numQuestions) {
         "It's just interesting",
         "It helps in daily life"
       ],
-      correctIndex: 3
+      correctIndex: 3,
+      explanation: `${topic} plays a significant role in everyday life and has practical applications in many contexts.`
     }
   ];
   
