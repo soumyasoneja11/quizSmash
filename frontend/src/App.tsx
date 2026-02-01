@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import "./App.css";
 import { audioManager } from "./audio";
 import { particleSystem, celebrationCSS } from "./animations";
+import PixelButton from "./components/PixelButton";
+import PixelCard from "./components/PixelCard";
+import PixelInput from "./components/PixelInput";
+import GameHeader from "./components/GameHeader";
+import PixelProgress from "./components/PixelProgress";
 
+// Types
 type Room = {
   id: number;
   code: string;
@@ -62,9 +67,8 @@ const QUESTION_TIME = 20; // seconds per question
 function App() {
   const socketRef = useRef<Socket | null>(null);
 
-  const [view, setView] = useState<"home" | "categories" | "lobby" | "game" | "results" | "answer-reveal">(
-    "home",
-  );
+  // State variables
+  const [view, setView] = useState<"home" | "categories" | "lobby" | "game" | "results" | "answer-reveal">("home");
   const [username, setUsername] = useState("");
   const [roomCodeInput, setRoomCodeInput] = useState("");
   const [roomCode, setRoomCode] = useState("");
@@ -124,13 +128,11 @@ function App() {
       setIsHost(false);
       setView("lobby");
       setErrorMessage("");
-      // Play join sound
       audioManager.playSound('join');
     });
 
     socket.on("player-joined", ({ players }) => {
       setPlayers(players);
-      // Play join sound for others joining
       audioManager.playSound('join');
     });
 
@@ -147,9 +149,7 @@ function App() {
       setFeedback(null);
       setScores([]);
       setView("game");
-      // Play game start sound
       audioManager.playSound('round-start');
-      // Initialize particle system for the game container
       particleSystem.init('root');
     });
 
@@ -199,7 +199,6 @@ function App() {
       setTimeLeft((prev) => {
         const newTime = prev - 1;
         
-        // Play timer warning sounds
         if (newTime === 5) {
           audioManager.playSound('timer-warn');
         } else if (newTime === 0) {
@@ -221,7 +220,6 @@ function App() {
       setTimeLeft(QUESTION_TIME);
       setSelectedAnswer(null);
       setFeedback(null);
-      // Play round start sound
       audioManager.playSound('round-start');
     }
   }, [currentQuestion, view]);
@@ -236,30 +234,24 @@ function App() {
       const y = rect?.top ?? window.innerHeight / 2;
 
       if (feedback.isCorrect) {
-        // Play correct sound
         await audioManager.playSound('correct');
         
-        // Create celebration effects
         if (feedback.speedBonus) {
-          // Extra celebration for speed bonus
           particleSystem.createConfetti(x, y, 40);
           particleSystem.createSparkles(x - 100, y - 50, 20);
           particleSystem.createFloatingText(x, y - 80, '⚡ SPEED BONUS!', '#FFD700');
           await audioManager.playSound('victory');
         } else {
-          // Standard correct answer celebration
           particleSystem.createConfetti(x, y, 25);
           particleSystem.createFloatingText(x, y - 80, `+${feedback.pointsEarned}`, '#00FF00');
         }
         
-        // Bounce effect on feedback box
         const feedbackBox = document.querySelector('.feedback-box');
         if (feedbackBox) {
           feedbackBox.classList.add('celebration-active');
           setTimeout(() => feedbackBox.classList.remove('celebration-active'), 600);
         }
       } else {
-        // Play incorrect sound
         await audioManager.playSound('incorrect');
       }
     };
@@ -279,6 +271,7 @@ function App() {
       const data = await response.json();
       setRooms(data);
     } catch (error) {
+      console.error("Failed to fetch rooms:", error);
       setRooms([]);
     }
   };
@@ -297,6 +290,7 @@ function App() {
     setSelectedAnswer(null);
     setFeedback(null);
     setStatusMessage("");
+    setErrorMessage("");
   };
 
   const handleCreateRoom = () => {
@@ -343,9 +337,8 @@ function App() {
     if (!currentQuestion || !playerId || selectedAnswer !== null) return;
     setSelectedAnswer(answerIndex ?? -1);
     
-    // Calculate speed bonus
     const speedFactor = timeLeft / QUESTION_TIME;
-    const hasSpeedBonus = speedFactor > 0.5; // Bonus if answered in first 10 seconds
+    const hasSpeedBonus = speedFactor > 0.5;
     
     socketRef.current?.emit("submit-answer", {
       roomCode,
@@ -364,454 +357,558 @@ function App() {
     });
   };
 
-  const renderHome = () => (
-    <div className="home">
-      {/* Hero Banner */}
-      <div className="hero-banner">
-        <svg viewBox="0 0 1200 300" preserveAspectRatio="xMidYMid slice" className="carnival-bg">
-          {/* Sky gradient background */}
-          <defs>
-            <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" style={{stopColor: '#87CEEB', stopOpacity: 1}} />
-              <stop offset="100%" style={{stopColor: '#E0F6FF', stopOpacity: 1}} />
-            </linearGradient>
-          </defs>
-          <rect width="1200" height="300" fill="url(#skyGradient)" />
-          
-          {/* Clouds */}
-          <circle cx="200" cy="50" r="30" fill="white" opacity="0.8" />
-          <circle cx="220" cy="55" r="25" fill="white" opacity="0.7" />
-          <circle cx="800" cy="80" r="35" fill="white" opacity="0.8" />
-          <circle cx="830" cy="90" r="28" fill="white" opacity="0.7" />
-          
-          {/* Bunting lines */}
-          <line x1="100" y1="80" x2="300" y2="100" stroke="#FFD700" strokeWidth="3" />
-          <line x1="400" y1="70" x2="600" y2="85" stroke="#FF69B4" strokeWidth="3" />
-          <line x1="700" y1="90" x2="900" y2="75" stroke="#00CED1" strokeWidth="3" />
-          <line x1="1000" y1="80" x2="1150" y2="95" stroke="#32CD32" strokeWidth="3" />
-          
-          {/* Central Tent */}
-          <polygon points="600,80 650,150 550,150" fill="#C084FC" />
-          <polygon points="650,150 700,150 650,150 600,80" fill="#7C3AED" opacity="0.8" />
-          <polygon points="550,150 600,80 550,150" fill="#9333EA" opacity="0.8" />
-          
-          {/* Tent entrance */}
-          <ellipse cx="600" cy="150" rx="30" ry="15" fill="#2D1B69" />
-          
-          {/* Ground */}
-          <rect y="165" width="1200" height="135" fill="#90EE90" />
-          
-          {/* Trees */}
-          <g>
-            <rect x="100" y="140" width="20" height="40" fill="#8B4513" />
-            <polygon points="110,140 90,120 130,120" fill="#228B22" />
-            <polygon points="110,130 85,110 135,110" fill="#32CD32" />
-          </g>
-          <g>
-            <rect x="1050" y="135" width="25" height="45" fill="#8B4513" />
-            <polygon points="1062,135 1035,110 1090,110" fill="#228B22" />
-            <polygon points="1062,123 1030,98 1095,98" fill="#32CD32" />
-          </g>
-        </svg>
-      </div>
+  const renderHome = () => {
+    return (
+      <div className="min-h-screen bg-gray-900 p-4 md:p-8 relative overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 bg-pixel-grid bg-[length:20px_20px] opacity-10"></div>
 
-      {/* Main Content */}
-      <div className="home-content">
-        {/* Left Panel - Create Room */}
-        <div className="home-panel create-room-panel">
-          <h2>START A NEW ROOM</h2>
-          
-          {/* Game Mode Cards */}
-          <div className="game-modes">
-            <div className="game-mode-card">
-              <div className="game-mode-icon">🎮</div>
-              <h3>Game Selector</h3>
-              <p>Vote on what to play</p>
-            </div>
-            <div className="game-mode-card">
-              <div className="game-mode-icon">💣</div>
-              <h3>BombParty</h3>
-              <p>Explosive word game</p>
-            </div>
-            <div className="game-mode-card">
-              <div className="game-mode-icon">🥤</div>
-              <h3>PopSauce</h3>
-              <p>Blind test for your eyes</p>
-            </div>
+        {/* Floating pixels */}
+        <div className="absolute top-10 left-10 w-4 h-4 bg-pixel-purple animate-bounce"></div>
+        <div className="absolute top-20 right-20 w-4 h-4 bg-pixel-cyan animate-bounce delay-100"></div>
+        <div className="absolute bottom-20 left-1/4 w-4 h-4 bg-pixel-yellow animate-bounce delay-200"></div>
+
+        <div className="max-w-7xl mx-auto relative z-10">
+          {/* Hero Section */}
+          <div className="text-center mb-12">
+            <h1 className="font-pixel text-5xl md:text-7xl text-white mb-6 animate-pulse">
+              <span className="bg-clip-text text-transparent bg-gradient-to-r from-pixel-purple via-pixel-cyan to-pixel-yellow">
+                PIXEL QUIZ
+              </span>
+            </h1>
+            <p className="font-silkscreen text-xl text-gray-300 mb-8">
+              🎮 Test your knowledge in this pixelated trivia adventure!
+            </p>
           </div>
 
-          {/* Room Creation Form */}
-          <div className="room-creation">
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder={username || `${username || "Guest" + Math.floor(Math.random() * 10000)}'s room`}
-              className="room-name-input"
-            />
-            <div className="button-group">
-              <div className="button-pair">
-                <button className="secondary">🌐 Public</button>
-                <button className="secondary">🔒 Private</button>
-              </div>
-              <button className="primary" onClick={handleCreateRoom}>
-                Play
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Panel - Join Room */}
-        <div className="home-panel join-room-panel">
-          <h2>JOIN A PRIVATE ROOM</h2>
-          
-          <div className="join-form">
-            <div className="form-row">
-              <label>Username:</label>
-              <input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                placeholder="Enter your name..."
-                className="username-input"
-              />
-            </div>
-            <div className="form-row">
-              <label>Code:</label>
-              <div className="join-input-group">
-                <input
-                  value={roomCodeInput}
-                  onChange={(event) =>
-                    setRoomCodeInput(event.target.value.toUpperCase())
-                  }
-                  placeholder="Enter code..."
-                  maxLength={6}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            {/* Left Panel - Create Room */}
+            <PixelCard
+              title="CREATE GAME"
+              emoji="🎮"
+              glow={true}
+              borderColor="border-pixel-purple"
+            >
+              <div className="space-y-6">
+                <PixelInput
+                  value={username}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+                  placeholder="ENTER PLAYER NAME"
+                  className="text-center text-lg" 
                 />
-                <button className="primary-icon" onClick={handleJoinRoom}>
-                  Join
-                </button>
-              </div>
-            </div>
-          </div>
 
-          {errorMessage && <p className="error">{errorMessage}</p>}
-        </div>
-      </div>
-
-      {/* Room Stats Section */}
-      <section className="room-stats">
-        <div className="stats-header">
-          <p className="stats-text">
-            Play with {rooms.length} players in {Math.ceil(rooms.length / 4)} public rooms and {Math.floor(rooms.length / 2)} private rooms
-          </p>
-          <div className="stats-actions">
-            <input type="text" placeholder="Filter..." className="filter-input" />
-            <button className="refresh-btn" onClick={fetchRooms}>Refresh</button>
-          </div>
-        </div>
-
-        {/* Active Rooms Grid */}
-        {rooms.length === 0 ? (
-          <p className="empty">No rooms yet. Create one!</p>
-        ) : (
-          <div className="room-grid">
-            {rooms.map((room) => (
-              <button
-                className="room-card"
-                key={room.code}
-                onClick={() => setRoomCodeInput(room.code)}
-              >
-                <div>
-                  <h3>{room.code}</h3>
-                  <p>
-                    {room.topic || "Custom"} • {room.difficulty || "medium"}
-                  </p>
+                <div className="grid grid-cols-3 gap-4">
+                  {['🎯 CLASSIC', '⚡ SPEED', '💀 HARD'].map((mode) => (
+                    <button
+                      key={mode}
+                      className="font-pixel text-sm bg-gray-900 border-2 border-black p-4 hover:bg-gray-800 hover:scale-105 transition-transform"
+                    >
+                      {mode}
+                    </button>
+                  ))}
                 </div>
-                <span className="player-count">{room.player_count} players</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
-  );
 
-  const renderLobby = () => (
-    <div className="lobby">
-      <div className="lobby-header">
-        <div>
-          <p className="eyebrow">Room code</p>
-          <h2>{roomCode}</h2>
-          <p className="muted">Share this code to invite friends ({players.length}/4 players)</p>
-        </div>
-        <div className="lobby-actions">
-          {isHost && <span className="host-badge">👑 Host</span>}
-          <button onClick={resetToHome} className="ghost">
-            Leave lobby
-          </button>
+                <div className="pt-4 border-t-2 border-gray-700">
+                  <PixelButton
+                    variant="primary"
+                    size="lg"
+                    className="w-full"
+                    onClick={handleCreateRoom}
+                    glow={true}
+                  >
+                    🚀 START GAME
+                  </PixelButton>
+                </div>
+              </div>
+            </PixelCard>
+
+            {/* Right Panel - Join Room */}
+            <PixelCard
+              title="JOIN GAME"
+              emoji="🔗"
+              borderColor="border-pixel-blue"
+            >
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <PixelInput
+                    value={roomCodeInput}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoomCodeInput(e.target.value.toUpperCase())}
+                    placeholder="ENTER GAME CODE"
+                    maxLength={6}
+                    className="text-center text-2xl tracking-widest" 
+                  />
+
+                  <div className="flex gap-4">
+                    {['A', 'B', 'C', 'D', 'E', 'F'].map((letter) => (
+                      <button
+                        key={letter}
+                        className="flex-1 font-pixel bg-gray-900 border-2 border-black p-3 hover:bg-gray-800"
+                        onClick={() => setRoomCodeInput(prev => (prev + letter).slice(0, 6))}
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <PixelButton
+                  variant="secondary"
+                  size="lg"
+                  className="w-full"
+                  onClick={handleJoinRoom}
+                >
+                  🔗 JOIN ROOM
+                </PixelButton>
+
+                {errorMessage && (
+                  <div className="font-pixel text-pixel-red text-center animate-pixel-shake">
+                    ⚠️ {errorMessage}
+                  </div>
+                )}
+              </div>
+            </PixelCard>
+          </div>
+
+          {/* Active Rooms Section */}
+          <PixelCard title="ACTIVE GAMES" emoji="🌐">
+            <div className="flex justify-between items-center mb-6">
+              <p className="font-silkscreen text-gray-400">
+                {rooms.length} games online • {rooms.reduce((acc: number, r: Room) => acc + r.player_count, 0)} players
+              </p>
+              <PixelButton
+                variant="info"
+                size="sm"
+                onClick={fetchRooms}
+              >
+                🔄 REFRESH
+              </PixelButton>
+            </div>
+
+            {rooms.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="font-pixel text-gray-500 text-6xl mb-4">?</div>
+                <p className="font-silkscreen text-gray-400">No active games found</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {rooms.map((room: Room) => (
+                  <button
+                    key={room.code}
+                    className="text-left bg-gray-900 border-2 border-black p-4 hover:bg-gray-800 hover:scale-105 transition-transform group"
+                    onClick={() => setRoomCodeInput(room.code)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-pixel text-white group-hover:text-pixel-cyan transition-colors">
+                        {room.code}
+                      </h3>
+                      <span className="font-pixel text-pixel-yellow bg-black px-2 py-1">
+                        {room.player_count}/8
+                      </span>
+                    </div>
+                    <div className="font-silkscreen text-sm text-gray-400 space-y-1">
+                      <div>📍 {room.topic || "Random"}</div>
+                      <div>⚡ {room.difficulty?.toUpperCase() || "MEDIUM"}</div>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex-1 h-2 bg-gray-800">
+                          <div
+                            className="h-full bg-pixel-green"
+                            style={{ width: `${(room.player_count / 8) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-xs">JOIN</span>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </PixelCard>
         </div>
       </div>
+    );
+  };
 
-      <div className="lobby-content">
-        <div className="panel">
-          <h3>🎮 Players</h3>
-          <ul className="player-list">
-            {players.map((player) => (
-              <li key={player.id} className={playerId === player.id ? "self" : ""}>
-                <span>{player.username}</span>
-                <span className="pill">
-                  {player.score} pts
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {isHost && (
-          <div className="panel">
-            <h3>🏆 Categories</h3>
-            <div className="category-grid">
-              {GAME_CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  className={`category-btn ${selectedCategory === cat.name ? "selected" : ""}`}
-                  onClick={() => setSelectedCategory(cat.name)}
-                  disabled={!isHost}
-                  title={cat.description}
+  // Lobby View
+  const renderLobby = () => (
+    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+      <GameHeader
+        title="LOBBY"
+        subtitle={`ROOM: ${roomCode}`}
+        score={players.find(p => p.id === playerId)?.score || 0}
+      />
+      
+      <div className="max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Players List */}
+          <PixelCard title="PLAYERS" emoji="👥" className="lg:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {players.map((player: Player, index: number) => (
+                <div
+                  key={player.id}
+                  className={`p-4 border-4 ${
+                    playerId === player.id 
+                      ? 'border-pixel-yellow bg-gray-800' 
+                      : 'border-black bg-gray-900'
+                  }`}
                 >
-                  <span className="category-emoji">{cat.emoji}</span>
-                  <span className="category-name">{cat.name}</span>
-                </button>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="font-pixel text-gray-400">#{index + 1}</span>
+                      <span className="font-pixel text-white">{player.username}</span>
+                      {isHost && player.id === playerId && (
+                        <span className="font-pixel text-xs bg-pixel-purple px-2 py-1">HOST</span>
+                      )}
+                    </div>
+                    <span className="font-pixel text-pixel-yellow">
+                      {player.score} PTS
+                    </span>
+                  </div>
+                  {player.is_ready === 1 && (
+                    <div className="mt-2 font-silkscreen text-green-400 text-sm">
+                      ✅ READY
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          </div>
-        )}
+          </PixelCard>
 
-        <div className="panel">
-          <h3>⚙️ Game setup</h3>
-          <label>
-            Category
-            <input
-              value={selectedCategory}
-              onChange={(event) => setSelectedCategory(event.target.value)}
-              disabled={!isHost}
-              placeholder="Choose a category or enter custom"
-            />
-          </label>
-          <label>
-            Difficulty
-            <select
-              value={difficulty}
-              onChange={(event) => setDifficulty(event.target.value)}
-              disabled={!isHost}
-            >
-              <option value="easy">🟢 Easy - More time, easier questions</option>
-              <option value="medium">🟡 Medium - Standard difficulty</option>
-              <option value="hard">🔴 Hard - Less time, tricky questions</option>
-            </select>
-          </label>
-          <div className="setup-actions">
-            {isHost ? (
-              <>
-                <button className="primary" onClick={handleStartGame}>
-                  🚀 Start Game
-                </button>
-                <p className="muted">Ready to begin? Click start!</p>
-              </>
-            ) : (
-              <>
-                <button className="primary" onClick={handleReady}>
-                  ✓ Ready
-                </button>
-                <p className="muted">Waiting for host to start...</p>
-              </>
-            )}
-          </div>
-          {statusMessage && <p className="success-msg">{statusMessage}</p>}
-          {errorMessage && <p className="error">{errorMessage}</p>}
+          {/* Game Settings */}
+          <PixelCard title="SETTINGS" emoji="⚙️">
+            <div className="space-y-6">
+              <div>
+                <label className="font-pixel text-gray-300 mb-2 block">CATEGORY</label>
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="w-full font-silkscreen bg-gray-900 border-4 border-black p-3 text-white"
+                >
+                  {GAME_CATEGORIES.map(cat => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.emoji} {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="font-pixel text-gray-300 mb-2 block">DIFFICULTY</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['EASY', 'MEDIUM', 'HARD'].map(diff => (
+                    <button
+                      key={diff}
+                      className={`font-pixel p-2 border-4 ${
+                        difficulty === diff.toLowerCase()
+                          ? 'border-pixel-green bg-gray-800'
+                          : 'border-black bg-gray-900'
+                      }`}
+                      onClick={() => setDifficulty(diff.toLowerCase())}
+                    >
+                      {diff}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <PixelProgress 
+                value={players.filter(p => p.is_ready === 1).length}
+                max={players.length}
+                label="READY PLAYERS"
+                color="green"
+              />
+              
+              <div className="space-y-3 pt-4 border-t-2 border-gray-700">
+                {isHost ? (
+                  <PixelButton
+                    variant="success"
+                    className="w-full"
+                    onClick={handleStartGame}
+                    disabled={players.length < 2}
+                    glow={players.length >= 2}
+                  >
+                    🚀 START GAME ({players.length}/8)
+                  </PixelButton>
+                ) : (
+                  <PixelButton
+                    variant="primary"
+                    className="w-full"
+                    onClick={handleReady}
+                  >
+                    ✅ READY UP
+                  </PixelButton>
+                )}
+                
+                <PixelButton
+                  variant="danger"
+                  className="w-full"
+                  onClick={resetToHome}
+                >
+                  🏃 LEAVE
+                </PixelButton>
+              </div>
+              {statusMessage && (
+                <div className="font-silkscreen text-green-400 text-center mt-2">
+                  {statusMessage}
+                </div>
+              )}
+            </div>
+          </PixelCard>
         </div>
       </div>
     </div>
   );
 
+  // Game View
   const renderGame = () => (
-    <div className="game">
-      <header className="game-header">
-        <div className="question-info">
-          <p className="eyebrow">Round {currentRound} of {totalQuestions}</p>
-          <h2>{currentQuestion?.question}</h2>
-        </div>
-        
-        <div className="game-stats">
-          <div className={`timer ${timeLeft <= 5 ? "warning" : ""}`}>
-            <svg className="timer-circle" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="45" className="timer-bg" />
-              <circle 
-                cx="50" 
-                cy="50" 
-                r="45" 
-                className="timer-fill"
-                style={{
-                  strokeDasharray: `${(timeLeft / QUESTION_TIME) * 283} 283`,
-                }}
-              />
-            </svg>
-            <div className="timer-text">
-              <span>{timeLeft}s</span>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+      <GameHeader
+        title={`ROUND ${currentRound}/${totalQuestions}`}
+        score={players.find(p => p.id === playerId)?.score || 0}
+        timeLeft={timeLeft}
+        showTimer={true}
+        lives={3}
+      />
+      
+      <div className="max-w-6xl mx-auto">
+        <PixelCard title="QUESTION" emoji="❓" className="mb-8">
+          <h2 className="font-pixel text-2xl text-white mb-6">
+            {currentQuestion?.question}
+          </h2>
           
-          <div className="scoreboard">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {currentQuestion?.options.map((option, index) => (
+              <button
+                key={option}
+                className={`p-4 border-4 text-left transition-all ${
+                  selectedAnswer === index
+                    ? 'border-pixel-yellow bg-gray-800'
+                    : 'border-black bg-gray-900 hover:bg-gray-800'
+                } ${
+                  feedback && index === feedback.correctAnswer
+                    ? 'border-pixel-green bg-green-900/20'
+                    : ''
+                } ${
+                  feedback && selectedAnswer === index && !feedback.isCorrect
+                    ? 'border-pixel-red bg-red-900/20'
+                    : ''
+                }`}
+                onClick={() => handleAnswer(index)}
+                disabled={selectedAnswer !== null}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="font-pixel w-10 h-10 flex items-center justify-center border-2 border-black bg-gray-800">
+                    {String.fromCharCode(65 + index)}
+                  </div>
+                  <span className="font-silkscreen text-white">{option}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </PixelCard>
+
+        {feedback && (
+          <PixelCard 
+            title={feedback.isCorrect ? "CORRECT! 🎉" : "INCORRECT ❌"} 
+            emoji={feedback.isCorrect ? "✅" : "❌"}
+            borderColor={feedback.isCorrect ? "border-pixel-green" : "border-pixel-red"}
+            className="feedback-box"
+          >
+            <div className="space-y-4">
+              <p className="font-silkscreen text-white">
+                The correct answer was: <span className="font-pixel text-pixel-cyan">
+                  {String.fromCharCode(65 + feedback.correctAnswer)}
+                </span>
+              </p>
+              
+              {currentQuestion?.explanation && (
+                <div className="bg-gray-800 border-2 border-black p-4">
+                  <p className="font-pixel text-pixel-yellow mb-2">💡 DID YOU KNOW?</p>
+                  <p className="font-silkscreen text-gray-300">{currentQuestion.explanation}</p>
+                </div>
+              )}
+              
+              <div className="bg-gray-800 border-2 border-black p-4">
+                <div className="font-pixel text-white space-y-2">
+                  <div className="flex justify-between">
+                    <span>Base points:</span>
+                    <span className="text-pixel-green">+100</span>
+                  </div>
+                  {feedback.speedBonus && (
+                    <div className="flex justify-between">
+                      <span>Speed bonus:</span>
+                      <span className="text-pixel-yellow">+50</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t-2 border-gray-700 pt-2">
+                    <span>Total earned:</span>
+                    <span className="text-pixel-cyan">+{feedback.pointsEarned}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {isHost && currentRound < totalQuestions && (
+                <PixelButton
+                  variant="primary"
+                  className="w-full"
+                  onClick={handleNextQuestion}
+                >
+                  NEXT QUESTION →
+                </PixelButton>
+              )}
+              {isHost && currentRound >= totalQuestions && (
+                <PixelButton
+                  variant="success"
+                  className="w-full"
+                  onClick={() => setView("results")}
+                >
+                  VIEW RESULTS
+                </PixelButton>
+              )}
+            </div>
+          </PixelCard>
+        )}
+
+        {!feedback && selectedAnswer !== null && (
+          <div className="text-center mt-8">
+            <p className="font-silkscreen text-gray-400">
+              ✅ Answer submitted! Waiting for other players...
+            </p>
+          </div>
+        )}
+
+        <PixelCard title="LEADERBOARD" emoji="🏆" className="mt-8">
+          <div className="space-y-2">
             {scores.length === 0 ? (
-              <p className="muted">No scores yet</p>
+              <p className="font-silkscreen text-gray-400 text-center py-4">
+                No scores yet
+              </p>
             ) : (
               scores.map((score, idx) => (
-                <div key={score.username} className={`score-entry ${idx === 0 ? "first" : ""}`}>
-                  <span className="rank">#{idx + 1}</span>
-                  <span className="name">{score.username}</span>
-                  <strong className="points">{score.score}</strong>
+                <div
+                  key={score.username}
+                  className={`flex justify-between items-center p-3 border-2 ${
+                    idx === 0
+                      ? 'border-pixel-yellow bg-yellow-900/10'
+                      : 'border-black bg-gray-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-pixel text-gray-400">#{idx + 1}</span>
+                    <span className="font-pixel text-white">{score.username}</span>
+                    {score.username === username && (
+                      <span className="font-pixel text-xs bg-pixel-purple px-2 py-1">YOU</span>
+                    )}
+                  </div>
+                  <span className="font-pixel text-pixel-yellow">
+                    {score.score} PTS
+                  </span>
                 </div>
               ))
             )}
           </div>
-        </div>
-      </header>
-
-      <div className="options">
-        {currentQuestion?.options.map((option, index) => (
-          <button
-            key={option}
-            className={`option ${
-              selectedAnswer === index ? "selected" : ""
-            } ${
-              feedback && index === feedback.correctAnswer ? "correct" : ""
-            } ${
-              feedback && selectedAnswer === index && !feedback.isCorrect ? "incorrect" : ""
-            }`}
-            onClick={() => handleAnswer(index)}
-            disabled={selectedAnswer !== null}
-          >
-            <span className="option-letter">{String.fromCharCode(65 + index)}</span>
-            <span className="option-text">{option}</span>
-          </button>
-        ))}
-      </div>
-
-      <div className="game-footer">
-        {feedback && (
-          <div className={`feedback-panel ${feedback.isCorrect ? "success" : "failure"}`}>
-            <div className="feedback-content">
-              <h3>{feedback.isCorrect ? "🎉 Correct!" : "❌ Incorrect"}</h3>
-              <p className="feedback-detail">
-                {feedback.isCorrect 
-                  ? `The correct answer was ${String.fromCharCode(65 + feedback.correctAnswer)}`
-                  : `The correct answer was ${String.fromCharCode(65 + feedback.correctAnswer)}`
-                }
-              </p>
-              {currentQuestion?.explanation && (
-                <div className="explanation-box">
-                  <p className="explanation-title">💡 Did you know?</p>
-                  <p className="explanation-text">{currentQuestion.explanation}</p>
-                </div>
-              )}
-              <div className="points-breakdown">
-                <span>Base points: <strong>+100</strong></span>
-                {feedback.speedBonus && <span className="bonus">Speed bonus: <strong>+50</strong></span>}
-                <span className="total">Total earned: <strong>+{feedback.pointsEarned}</strong></span>
-              </div>
-            </div>
-            {isHost && currentRound < totalQuestions && (
-              <button className="primary" onClick={handleNextQuestion}>
-                Next question →
-              </button>
-            )}
-            {isHost && currentRound >= totalQuestions && (
-              <button className="primary" onClick={() => setView("results")}>
-                View results
-              </button>
-            )}
-          </div>
-        )}
-        {!feedback && (
-          <p className="submitted-message">
-            {selectedAnswer !== null 
-              ? "Waiting for answers..."
-              : "Select an answer quickly!"}
-          </p>
-        )}
+        </PixelCard>
       </div>
     </div>
   );
 
+  // Results View
   const renderResults = () => (
-    <div className="results">
-      <div className="panel">
-        <h1>🎉 Game Over! 🎉</h1>
-        <p className="subtext" style={{marginTop: '1rem', marginBottom: '2rem'}}>
-          Great job everyone! Check out the final standings below.
-        </p>
-        
-        <div className="final-leaderboard">
-          {leaderboard.length > 0 && (
-            <div className="podium">
+    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <PixelCard title="GAME OVER!" emoji="🏆" glow={true} className="text-center">
+          <h1 className="font-pixel text-4xl text-white mb-6">
+            🎉 FINAL RESULTS 🎉
+          </h1>
+          
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {leaderboard.slice(0, 3).map((entry, idx) => (
-                <div key={entry.username} className="podium-place">
-                  <div className="podium-medal">
+                <div
+                  key={entry.username}
+                  className={`p-6 border-4 ${
+                    idx === 0
+                      ? 'border-pixel-yellow bg-yellow-900/20'
+                      : idx === 1
+                      ? 'border-gray-400 bg-gray-800'
+                      : 'border-amber-700 bg-amber-900/20'
+                  }`}
+                >
+                  <div className="font-pixel text-5xl mb-4">
                     {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                   </div>
-                  <div className="podium-rank">
-                    {idx === 0 ? '1st Place' : idx === 1 ? '2nd Place' : '3rd Place'}
+                  <div className="font-pixel text-xl text-white mb-2">
+                    {entry.username}
                   </div>
-                  <div className="name">{entry.username}</div>
-                  <div className="points" style={{fontSize: '1.5rem', marginTop: '0.5rem', color: 'var(--success)'}}>
-                    {entry.score} pts
+                  <div className="font-pixel text-3xl text-pixel-yellow">
+                    {entry.score} PTS
                   </div>
                 </div>
               ))}
             </div>
-          )}
-          
-          {leaderboard.length > 3 && (
-            <div style={{marginTop: '2rem', textAlign: 'left'}}>
-              <h3>Other Players:</h3>
-              <ol style={{paddingLeft: '2rem'}}>
-                {leaderboard.slice(3).map((entry, idx) => (
-                  <li key={entry.username} style={{marginBottom: '0.5rem'}}>
-                    <span>#{idx + 4} - {entry.username}</span>
-                    <strong style={{marginLeft: '1rem'}}>{entry.score} pts</strong>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          )}
-        </div>
 
-        <div style={{display: 'flex', gap: '1rem', justifyContent: 'center', marginTop: '2rem'}}>
-          <button className="primary" onClick={resetToHome} style={{flex: 1, maxWidth: '200px'}}>
-            🏠 Back to home
-          </button>
-          <button 
-            className="secondary" 
-            onClick={() => {
-              setPlayers([]);
-              handleCreateRoom();
-            }}
-            style={{flex: 1, maxWidth: '200px'}}
-          >
-            🔄 Play Again
-          </button>
-        </div>
+            {leaderboard.length > 3 && (
+              <div className="bg-gray-800 border-4 border-black p-6">
+                <h3 className="font-pixel text-white mb-4">OTHER PLAYERS</h3>
+                <div className="space-y-2">
+                  {leaderboard.slice(3).map((entry, idx) => (
+                    <div
+                      key={entry.username}
+                      className="flex justify-between items-center p-3 bg-gray-900 border-2 border-black"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="font-pixel text-gray-400">#{idx + 4}</span>
+                        <span className="font-pixel text-white">{entry.username}</span>
+                      </div>
+                      <span className="font-pixel text-pixel-yellow">
+                        {entry.score} PTS
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t-2 border-gray-700">
+              <PixelButton
+                variant="primary"
+                className="w-full"
+                onClick={resetToHome}
+              >
+                🏠 BACK TO HOME
+              </PixelButton>
+              <PixelButton
+                variant="secondary"
+                className="w-full"
+                onClick={() => {
+                  if (isHost) {
+                    handleStartGame();
+                  } else {
+                    setView("lobby");
+                  }
+                }}
+              >
+                🔄 PLAY AGAIN
+              </PixelButton>
+            </div>
+          </div>
+        </PixelCard>
       </div>
     </div>
   );
 
   // Audio Control Component
   const renderAudioControls = () => (
-    <div className="audio-controls">
+    <div className="fixed bottom-4 right-4 z-50 flex gap-2 bg-gray-900 border-4 border-black p-3">
       <button 
-        className={`audio-btn ${!audioManager.isEnabled() ? 'disabled' : ''}`}
+        className={`w-10 h-10 flex items-center justify-center border-2 border-black ${
+          !audioManager.isEnabled() ? 'bg-gray-700' : 'bg-pixel-purple'
+        }`}
         onClick={() => audioManager.setEnabled(!audioManager.isEnabled())}
         title={audioManager.isEnabled() ? 'Mute sounds' : 'Unmute sounds'}
       >
-        {audioManager.isEnabled() ? '🔊' : '🔇'}
+        <span className="font-pixel text-sm">
+          {audioManager.isEnabled() ? '🔊' : '🔇'}
+        </span>
       </button>
       <input 
         type="range" 
@@ -819,7 +916,7 @@ function App() {
         max="100" 
         value={audioManager.getVolume() * 100}
         onChange={(e) => audioManager.setVolume(Number(e.target.value) / 100)}
-        className="volume-slider"
+        className="w-24"
         title="Volume"
       />
     </div>
