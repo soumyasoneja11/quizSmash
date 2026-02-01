@@ -53,6 +53,7 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const GAME_CATEGORIES: GameCategory[] = [
+  { id: "general", name: "General Knowledge", emoji: "🧠", description: "Random topics" },
   { id: "science", name: "Science", emoji: "🔬", description: "Physics, chemistry, biology" },
   { id: "history", name: "History", emoji: "📚", description: "Historical events and figures" },
   { id: "geography", name: "Geography", emoji: "🌍", description: "Countries, capitals, landmarks" },
@@ -60,13 +61,14 @@ const GAME_CATEGORIES: GameCategory[] = [
   { id: "movies", name: "Movies", emoji: "🎬", description: "Films, actors, directors" },
   { id: "music", name: "Music", emoji: "🎵", description: "Artists, songs, genres" },
   { id: "technology", name: "Technology", emoji: "💻", description: "Tech companies, innovations" },
-  { id: "animals", name: "Animals", emoji: "🦁", description: "Wildlife and pets" },
 ];
 
-const QUESTION_TIME = 20; // seconds per question
+const QUESTION_TIME = 20;
 
 function App() {
   const socketRef = useRef<Socket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   // State variables
   const [view, setView] = useState<"home" | "categories" | "lobby" | "game" | "results" | "answer-reveal">("home");
@@ -107,13 +109,47 @@ function App() {
     };
   }, []);
 
+  // Initialize socket connection
   useEffect(() => {
+    console.log("Initializing socket connection to:", SOCKET_URL);
+    
     const socket = io(SOCKET_URL, {
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
+    
     socketRef.current = socket;
 
+    socket.on("connect", () => {
+      console.log("✅ Socket connected:", socket.id);
+      setConnected(true);
+      setConnectionError(null);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error.message);
+      setConnected(false);
+      setConnectionError(`Cannot connect to server: ${error.message}. Make sure backend is running on ${SOCKET_URL}`);
+    });
+
+    socket.on("disconnect", (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
+      setConnected(false);
+      if (reason === "io server disconnect") {
+        setConnectionError("Server disconnected. Trying to reconnect...");
+      }
+    });
+
+    socket.on("reconnect", (attemptNumber) => {
+      console.log("🔄 Reconnected after", attemptNumber, "attempts");
+      setConnected(true);
+      setConnectionError(null);
+    });
+
     socket.on("room-created", ({ roomCode, playerId }) => {
+      console.log("Room created:", roomCode, playerId);
       setRoomCode(roomCode);
       setPlayerId(playerId);
       setIsHost(true);
@@ -123,6 +159,7 @@ function App() {
     });
 
     socket.on("room-joined", ({ roomCode, playerId, players }) => {
+      console.log("Room joined:", roomCode, playerId);
       setRoomCode(roomCode);
       setPlayerId(playerId);
       setPlayers(players);
@@ -133,15 +170,18 @@ function App() {
     });
 
     socket.on("player-joined", ({ players }) => {
+      console.log("Player joined:", players);
       setPlayers(players);
       audioManager.playSound('join');
     });
 
     socket.on("player-left", ({ players }) => {
+      console.log("Player left:", players);
       setPlayers(players);
     });
 
     socket.on("game-started", ({ firstQuestion, totalQuestions, players }) => {
+      console.log("Game started:", firstQuestion);
       setPlayers(players);
       setCurrentQuestion(firstQuestion);
       setTotalQuestions(totalQuestions);
@@ -155,6 +195,7 @@ function App() {
     });
 
     socket.on("next-question", (question) => {
+      console.log("Next question:", question);
       setCurrentQuestion(question);
       setCurrentRound(question.round);
       setSelectedAnswer(null);
@@ -162,35 +203,55 @@ function App() {
     });
 
     socket.on("answer-feedback", (payload) => {
+      console.log("Answer feedback:", payload);
       setFeedback(payload);
     });
 
     socket.on("score-update", ({ scores }) => {
+      console.log("Score update:", scores);
       setScores(scores);
     });
 
     socket.on("all-players-ready", () => {
+      console.log("All players ready");
       setStatusMessage("Everyone is ready! Host can start the game.");
     });
 
     socket.on("game-completed", ({ leaderboard }) => {
+      console.log("Game completed:", leaderboard);
       setLeaderboard(leaderboard);
       setView("results");
     });
 
     socket.on("room-closed", ({ message }) => {
+      console.log("Room closed:", message);
       setErrorMessage(message || "Room closed.");
       resetToHome();
     });
 
     socket.on("error", ({ message }) => {
+      console.error("Socket error:", message);
       setErrorMessage(message || "Something went wrong.");
     });
 
     return () => {
+      console.log("Cleaning up socket connection");
       socket.disconnect();
     };
-  }, [username]);
+  }, []);
+
+  // Test server connection
+  const testConnection = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/test`);
+      const data = await response.json();
+      console.log("Server test:", data);
+      return true;
+    } catch (error) {
+      console.error("Server test failed:", error);
+      return false;
+    }
+  };
 
   // Timer countdown effect
   useEffect(() => {
@@ -263,13 +324,16 @@ function App() {
   useEffect(() => {
     if (view === "home") {
       fetchRooms();
+      testConnection();
     }
   }, [view]);
 
   const fetchRooms = async () => {
     try {
+      console.log("Fetching rooms from:", `${API_URL}/api/rooms`);
       const response = await fetch(`${API_URL}/api/rooms`);
       const data = await response.json();
+      console.log("Rooms fetched:", data);
       setRooms(data);
     } catch (error) {
       console.error("Failed to fetch rooms:", error);
@@ -294,15 +358,26 @@ function App() {
     setErrorMessage("");
   };
 
-  const handleCreateRoom = () => {
+  const handleCreateRoom = async () => {
     if (!username.trim()) {
       setErrorMessage("Enter a username first.");
       return;
     }
+
+    if (!connected || !socketRef.current) {
+      setErrorMessage("Not connected to server. Please wait...");
+      const isServerUp = await testConnection();
+      if (!isServerUp) {
+        setErrorMessage(`Cannot connect to server at ${SOCKET_URL}. Make sure backend is running.`);
+      }
+      return;
+    }
+
+    console.log("Creating room with username:", username);
     socketRef.current?.emit("create-room", username.trim());
   };
 
-  const handleJoinRoom = () => {
+  const handleJoinRoom = async () => {
     if (!username.trim()) {
       setErrorMessage("Enter a username first.");
       return;
@@ -311,6 +386,17 @@ function App() {
       setErrorMessage("Enter a room code.");
       return;
     }
+
+    if (!connected || !socketRef.current) {
+      setErrorMessage("Not connected to server. Please wait...");
+      const isServerUp = await testConnection();
+      if (!isServerUp) {
+        setErrorMessage(`Cannot connect to server at ${SOCKET_URL}. Make sure backend is running.`);
+      }
+      return;
+    }
+
+    console.log("Joining room:", roomCodeInput, "with username:", username);
     socketRef.current?.emit("join-room", {
       roomCode: roomCodeInput.trim().toUpperCase(),
       username: username.trim(),
@@ -318,6 +404,12 @@ function App() {
   };
 
   const handleStartGame = () => {
+    if (!socketRef.current) {
+      setErrorMessage("Not connected to server");
+      return;
+    }
+    
+    console.log("Starting game with:", { roomCode, topic: selectedCategory, difficulty });
     socketRef.current?.emit("start-game", {
       roomCode,
       topic: selectedCategory,
@@ -326,7 +418,7 @@ function App() {
   };
 
   const handleReady = () => {
-    if (!playerId) return;
+    if (!playerId || !socketRef.current) return;
     socketRef.current?.emit("player-ready", {
       roomCode,
       playerId,
@@ -335,11 +427,19 @@ function App() {
   };
 
   const handleAnswer = (answerIndex: number | null) => {
-    if (!currentQuestion || !playerId || selectedAnswer !== null) return;
+    if (!currentQuestion || !playerId || selectedAnswer !== null || !socketRef.current) return;
     setSelectedAnswer(answerIndex ?? -1);
     
     const speedFactor = timeLeft / QUESTION_TIME;
     const hasSpeedBonus = speedFactor > 0.5;
+    
+    console.log("Submitting answer:", { 
+      roomCode, 
+      playerId, 
+      questionId: currentQuestion.id, 
+      answerIndex,
+      timeRemaining: timeLeft 
+    });
     
     socketRef.current?.emit("submit-answer", {
       roomCode,
@@ -352,6 +452,7 @@ function App() {
   };
 
   const handleNextQuestion = () => {
+    if (!socketRef.current) return;
     socketRef.current?.emit("next-question", {
       roomCode,
       currentRound,
@@ -361,8 +462,32 @@ function App() {
   const renderHome = () => {
     return (
       <div className="min-h-screen bg-cyber-black p-4 md:p-8 relative overflow-hidden crt">
-        {/* Matrix background */}
         <MatrixBackground opacity={0.1} speed={1} />
+
+        {/* Connection Status */}
+        <div className="absolute top-4 right-4 z-50">
+          <div className={`px-4 py-2 rounded-lg font-pixel text-sm ${
+            connected 
+              ? 'bg-neon-green/20 border border-neon-green text-neon-green' 
+              : 'bg-neon-red/20 border border-neon-red text-neon-red'
+          }`}>
+            {connected ? '🟢 CONNECTED' : '🔴 DISCONNECTED'}
+          </div>
+        </div>
+
+        {connectionError && (
+          <div className="absolute top-16 right-4 z-50 max-w-md">
+            <div className="bg-cyber-dark border-2 border-neon-red p-4 rounded-lg">
+              <p className="font-pixel text-neon-red text-sm">{connectionError}</p>
+              <button 
+                onClick={testConnection}
+                className="mt-2 px-4 py-2 bg-neon-blue text-black font-pixel text-sm"
+              >
+                RETRY CONNECTION
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Floating neon orbs */}
         <div className="absolute top-10 left-10 w-4 h-4 bg-neon-pink rounded-full animate-neon-pulse"></div>
@@ -370,7 +495,6 @@ function App() {
         <div className="absolute bottom-20 left-1/4 w-4 h-4 bg-neon-green rounded-full animate-neon-pulse delay-200"></div>
         <div className="absolute bottom-1/2 right-1/4 w-4 h-4 bg-neon-purple rounded-full animate-neon-pulse delay-300"></div>
 
-        {/* Main content */}
         <div className="max-w-7xl mx-auto relative z-10">
           {/* Hero Section */}
           <div className="text-center mb-12">
@@ -425,8 +549,9 @@ function App() {
                     className="w-full"
                     onClick={handleCreateRoom}
                     glow={true}
+                    disabled={!connected}
                   >
-                    🚀 INITIATE GAME
+                    {connected ? '🚀 INITIATE GAME' : '⏳ CONNECTING...'}
                   </NeonButton>
                 </div>
               </div>
@@ -470,8 +595,9 @@ function App() {
                   className="w-full"
                   onClick={handleJoinRoom}
                   glow={true}
+                  disabled={!connected}
                 >
-                  🔗 CONNECT TO SERVER
+                  {connected ? '🔗 CONNECT TO SERVER' : '⏳ CONNECTING...'}
                 </NeonButton>
 
                 {errorMessage && (
@@ -489,20 +615,30 @@ function App() {
               <p className="font-synthwave text-cyber-teal">
                 {rooms.length} SERVERS ONLINE • {rooms.reduce((acc: number, r: Room) => acc + r.player_count, 0)} ACTIVE PLAYERS
               </p>
-              <NeonButton
-                variant="cyan"
-                size="sm"
-                onClick={fetchRooms}
-                glow={true}
-              >
-                🔄 RESCAN
-              </NeonButton>
+              <div className="flex gap-2">
+                <NeonButton
+                  variant="cyan"
+                  size="sm"
+                  onClick={fetchRooms}
+                  glow={true}
+                >
+                  🔄 RESCAN
+                </NeonButton>
+                <NeonButton
+                  variant="blue"
+                  size="sm"
+                  onClick={testConnection}
+                >
+                  🔌 TEST SERVER
+                </NeonButton>
+              </div>
             </div>
 
             {rooms.length === 0 ? (
               <div className="text-center py-12">
                 <div className="font-cyber text-neon-purple text-6xl mb-4 animate-neon-flicker">404</div>
                 <p className="font-matrix text-cyber-light">NO SERVERS DETECTED</p>
+                <p className="font-matrix text-cyber-teal text-sm mt-2">Start a new game to create the first server!</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -514,7 +650,6 @@ function App() {
                              group relative"
                     onClick={() => setRoomCodeInput(room.code)}
                   >
-                    {/* Glow effect */}
                     <div className="absolute inset-0 bg-neon-blue opacity-0 group-hover:opacity-10 transition-opacity"></div>
                     
                     <div className="relative z-10">
@@ -523,7 +658,7 @@ function App() {
                           {room.code}
                         </h3>
                         <span className="font-pixel text-neon-yellow bg-cyber-black px-2 py-1 border border-neon-yellow">
-                          {room.player_count}/8
+                          {room.player_count}/4
                         </span>
                       </div>
                       <div className="font-matrix text-sm text-cyber-teal space-y-1">
@@ -533,16 +668,16 @@ function App() {
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="text-neon-green">⚡</span>
-                          <span>{room.difficulty?.toUpperCase() || "NEUTRAL"}</span>
+                          <span>{room.difficulty?.toUpperCase() || "MEDIUM"}</span>
                         </div>
                         <div className="flex items-center gap-2 mt-2">
                           <div className="flex-1 h-1 bg-cyber-black">
                             <div 
                               className="h-full bg-gradient-to-r from-neon-pink to-neon-blue"
-                              style={{ width: `${(room.player_count / 8) * 100}%` }}
+                              style={{ width: `${(room.player_count / 4) * 100}%` }}
                             ></div>
                           </div>
-                          <span className="text-xs text-neon-yellow">ACCESS</span>
+                          <span className="text-xs text-neon-yellow">CLICK TO JOIN</span>
                         </div>
                       </div>
                     </div>
@@ -552,9 +687,21 @@ function App() {
             )}
           </CyberCard>
 
-          {/* Stats footer */}
-          <div className="mt-8 text-center font-matrix text-sm text-cyber-light">
-            <p>SYSTEM STATUS: <span className="text-neon-green">OPERATIONAL</span> | LATENCY: <span className="text-neon-cyan">23ms</span></p>
+          {/* Server Info */}
+          <div className="mt-8 text-center">
+            <div className="inline-block bg-cyber-dark border border-cyber-light p-4 rounded-lg">
+              <p className="font-matrix text-sm text-cyber-light">
+                SERVER: <span className="text-neon-cyan">{SOCKET_URL}</span> | 
+                STATUS: <span className={connected ? "text-neon-green" : "text-neon-red"}>
+                  {connected ? "OPERATIONAL" : "OFFLINE"}
+                </span>
+              </p>
+              {!connected && (
+                <p className="font-matrix text-xs text-neon-yellow mt-2">
+                  Make sure backend server is running on port 5000
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -575,7 +722,6 @@ function App() {
         />
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Players List */}
           <CyberCard title="PLAYERS" emoji="👥" glowColor="cyan" className="lg:col-span-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {players.map((player: Player, index: number) => (
@@ -666,7 +812,7 @@ function App() {
                     disabled={players.length < 2}
                     glow={players.length >= 2}
                   >
-                    🚀 INITIATE GAME ({players.length}/8)
+                    🚀 INITIATE GAME ({players.length}/4)
                   </NeonButton>
                 ) : (
                   <NeonButton
