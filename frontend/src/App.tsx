@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import { audioManager } from "./audio";
 import { particleSystem, celebrationCSS } from "./animations";
-import PixelButton from "./components/PixelButton";
-import PixelCard from "./components/PixelCard";
-import PixelInput from "./components/PixelInput";
-import GameHeader from "./components/GameHeader";
-import PixelProgress from "./components/PixelProgress";
+import NeonButton from "./components/NeonButton";
+import CyberCard from "./components/CyberCard";
+import NeonInput from "./components/NeonInput";
+import CyberHeader from "./components/CyberHeader";
+import NeonProgress from "./components/NeonProgress";
+import MatrixBackground from "./components/MatrixBackground";
 
 // Types
 type Room = {
@@ -359,170 +360,202 @@ function App() {
 
   const renderHome = () => {
     return (
-      <div className="min-h-screen bg-gray-900 p-4 md:p-8 relative overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 bg-pixel-grid bg-[length:20px_20px] opacity-10"></div>
+      <div className="min-h-screen bg-cyber-black p-4 md:p-8 relative overflow-hidden crt">
+        {/* Matrix background */}
+        <MatrixBackground opacity={0.1} speed={1} />
 
-        {/* Floating pixels */}
-        <div className="absolute top-10 left-10 w-4 h-4 bg-pixel-purple animate-bounce"></div>
-        <div className="absolute top-20 right-20 w-4 h-4 bg-pixel-cyan animate-bounce delay-100"></div>
-        <div className="absolute bottom-20 left-1/4 w-4 h-4 bg-pixel-yellow animate-bounce delay-200"></div>
+        {/* Floating neon orbs */}
+        <div className="absolute top-10 left-10 w-4 h-4 bg-neon-pink rounded-full animate-neon-pulse"></div>
+        <div className="absolute top-20 right-20 w-4 h-4 bg-neon-blue rounded-full animate-neon-pulse delay-100"></div>
+        <div className="absolute bottom-20 left-1/4 w-4 h-4 bg-neon-green rounded-full animate-neon-pulse delay-200"></div>
+        <div className="absolute bottom-1/2 right-1/4 w-4 h-4 bg-neon-purple rounded-full animate-neon-pulse delay-300"></div>
 
+        {/* Main content */}
         <div className="max-w-7xl mx-auto relative z-10">
           {/* Hero Section */}
           <div className="text-center mb-12">
-            <h1 className="font-pixel text-5xl md:text-7xl text-white mb-6 animate-pulse">
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-pixel-purple via-pixel-cyan to-pixel-yellow">
-                PIXEL QUIZ
+            <h1 className="font-cyber text-5xl md:text-7xl mb-6 animate-neon-pulse">
+              <span className="bg-gradient-to-r from-neon-pink via-neon-blue to-neon-green bg-clip-text text-transparent">
+                CYBER QUIZ
               </span>
             </h1>
-            <p className="font-silkscreen text-xl text-gray-300 mb-8">
-              🎮 Test your knowledge in this pixelated trivia adventure!
+            <p className="font-synthwave text-xl text-cyber-teal mb-8 animate-text-flicker">
+              🎮 NEON TRIVIA IN THE CYBERVERSE
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-            {/* Left Panel - Create Room */}
-            <PixelCard
+            {/* Left Panel - Create Game */}
+            <CyberCard
               title="CREATE GAME"
-              emoji="🎮"
-              glow={true}
-              borderColor="border-pixel-purple"
+              emoji="⚡"
+              glowColor="pink"
+              hologram={true}
             >
               <div className="space-y-6">
-                <PixelInput
+                <NeonInput
                   value={username}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
-                  placeholder="ENTER PLAYER NAME"
-                  className="text-center text-lg" 
+                  placeholder="ENTER CYBER-NAME"
+                  neonColor="cyan"
+                  className="text-center text-lg font-pixel"
                 />
 
                 <div className="grid grid-cols-3 gap-4">
-                  {['🎯 CLASSIC', '⚡ SPEED', '💀 HARD'].map((mode) => (
-                    <button
-                      key={mode}
-                      className="font-pixel text-sm bg-gray-900 border-2 border-black p-4 hover:bg-gray-800 hover:scale-105 transition-transform"
+                  {[
+                    { text: '⚡ SPEED', color: 'yellow' },
+                    { text: '🧠 HARD', color: 'red' },
+                    { text: '🎯 CLASSIC', color: 'green' }
+                  ].map((mode) => (
+                    <NeonButton
+                      key={mode.text}
+                      variant={mode.color as any}
+                      size="sm"
+                      className="w-full"
                     >
-                      {mode}
-                    </button>
+                      {mode.text}
+                    </NeonButton>
                   ))}
                 </div>
 
-                <div className="pt-4 border-t-2 border-gray-700">
-                  <PixelButton
-                    variant="primary"
+                <div className="pt-4 border-t-2 border-cyber-light">
+                  <NeonButton
+                    variant="pink"
                     size="lg"
                     className="w-full"
                     onClick={handleCreateRoom}
                     glow={true}
                   >
-                    🚀 START GAME
-                  </PixelButton>
+                    🚀 INITIATE GAME
+                  </NeonButton>
                 </div>
               </div>
-            </PixelCard>
+            </CyberCard>
 
-            {/* Right Panel - Join Room */}
-            <PixelCard
+            {/* Right Panel - Join Game */}
+            <CyberCard
               title="JOIN GAME"
               emoji="🔗"
-              borderColor="border-pixel-blue"
+              glowColor="blue"
             >
               <div className="space-y-6">
                 <div className="space-y-4">
-                  <PixelInput
+                  <NeonInput
                     value={roomCodeInput}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setRoomCodeInput(e.target.value.toUpperCase())}
-                    placeholder="ENTER GAME CODE"
+                    placeholder="ENTER ACCESS CODE"
                     maxLength={6}
-                    className="text-center text-2xl tracking-widest" 
+                    neonColor="purple"
+                    className="text-center text-2xl tracking-widest font-matrix"
                   />
 
-                  <div className="flex gap-4">
+                  <div className="grid grid-cols-6 gap-2">
                     {['A', 'B', 'C', 'D', 'E', 'F'].map((letter) => (
-                      <button
+                      <NeonButton
                         key={letter}
-                        className="flex-1 font-pixel bg-gray-900 border-2 border-black p-3 hover:bg-gray-800"
-                        onClick={() => setRoomCodeInput(prev => (prev + letter).slice(0, 6))}
+                        variant="cyan"
+                        size="sm"
+                        className="font-matrix"
+                        onClick={() => setRoomCodeInput((prev: string) => (prev + letter).slice(0, 6))}
                       >
                         {letter}
-                      </button>
+                      </NeonButton>
                     ))}
                   </div>
                 </div>
 
-                <PixelButton
-                  variant="secondary"
+                <NeonButton
+                  variant="green"
                   size="lg"
                   className="w-full"
                   onClick={handleJoinRoom}
+                  glow={true}
                 >
-                  🔗 JOIN ROOM
-                </PixelButton>
+                  🔗 CONNECT TO SERVER
+                </NeonButton>
 
                 {errorMessage && (
-                  <div className="font-pixel text-pixel-red text-center animate-pixel-shake">
+                  <div className="font-pixel text-neon-red text-center animate-glitch">
                     ⚠️ {errorMessage}
                   </div>
                 )}
               </div>
-            </PixelCard>
+            </CyberCard>
           </div>
 
-          {/* Active Rooms Section */}
-          <PixelCard title="ACTIVE GAMES" emoji="🌐">
+          {/* Active Games Section */}
+          <CyberCard title="ACTIVE SERVERS" emoji="🌐" glowColor="yellow">
             <div className="flex justify-between items-center mb-6">
-              <p className="font-silkscreen text-gray-400">
-                {rooms.length} games online • {rooms.reduce((acc: number, r: Room) => acc + r.player_count, 0)} players
+              <p className="font-synthwave text-cyber-teal">
+                {rooms.length} SERVERS ONLINE • {rooms.reduce((acc: number, r: Room) => acc + r.player_count, 0)} ACTIVE PLAYERS
               </p>
-              <PixelButton
-                variant="info"
+              <NeonButton
+                variant="cyan"
                 size="sm"
                 onClick={fetchRooms}
+                glow={true}
               >
-                🔄 REFRESH
-              </PixelButton>
+                🔄 RESCAN
+              </NeonButton>
             </div>
 
             {rooms.length === 0 ? (
               <div className="text-center py-12">
-                <div className="font-pixel text-gray-500 text-6xl mb-4">?</div>
-                <p className="font-silkscreen text-gray-400">No active games found</p>
+                <div className="font-cyber text-neon-purple text-6xl mb-4 animate-neon-flicker">404</div>
+                <p className="font-matrix text-cyber-light">NO SERVERS DETECTED</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {rooms.map((room: Room) => (
                   <button
                     key={room.code}
-                    className="text-left bg-gray-900 border-2 border-black p-4 hover:bg-gray-800 hover:scale-105 transition-transform group"
+                    className="text-left bg-cyber-gray border-2 border-cyber-light p-4 
+                             hover:border-neon-blue hover:scale-105 transition-all duration-300
+                             group relative"
                     onClick={() => setRoomCodeInput(room.code)}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-pixel text-white group-hover:text-pixel-cyan transition-colors">
-                        {room.code}
-                      </h3>
-                      <span className="font-pixel text-pixel-yellow bg-black px-2 py-1">
-                        {room.player_count}/8
-                      </span>
-                    </div>
-                    <div className="font-silkscreen text-sm text-gray-400 space-y-1">
-                      <div>📍 {room.topic || "Random"}</div>
-                      <div>⚡ {room.difficulty?.toUpperCase() || "MEDIUM"}</div>
-                      <div className="flex items-center gap-2 mt-2">
-                        <div className="flex-1 h-2 bg-gray-800">
-                          <div
-                            className="h-full bg-pixel-green"
-                            style={{ width: `${(room.player_count / 8) * 100}%` }}
-                          ></div>
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-neon-blue opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-cyber text-white group-hover:text-neon-cyan transition-colors">
+                          {room.code}
+                        </h3>
+                        <span className="font-pixel text-neon-yellow bg-cyber-black px-2 py-1 border border-neon-yellow">
+                          {room.player_count}/8
+                        </span>
+                      </div>
+                      <div className="font-matrix text-sm text-cyber-teal space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-neon-pink">📍</span>
+                          <span>{room.topic || "CYBER-CORE"}</span>
                         </div>
-                        <span className="text-xs">JOIN</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-neon-green">⚡</span>
+                          <span>{room.difficulty?.toUpperCase() || "NEUTRAL"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <div className="flex-1 h-1 bg-cyber-black">
+                            <div 
+                              className="h-full bg-gradient-to-r from-neon-pink to-neon-blue"
+                              style={{ width: `${(room.player_count / 8) * 100}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs text-neon-yellow">ACCESS</span>
+                        </div>
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
             )}
-          </PixelCard>
+          </CyberCard>
+
+          {/* Stats footer */}
+          <div className="mt-8 text-center font-matrix text-sm text-cyber-light">
+            <p>SYSTEM STATUS: <span className="text-neon-green">OPERATIONAL</span> | LATENCY: <span className="text-neon-cyan">23ms</span></p>
+          </div>
         </div>
       </div>
     );
@@ -530,58 +563,61 @@ function App() {
 
   // Lobby View
   const renderLobby = () => (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <GameHeader
-        title="LOBBY"
-        subtitle={`ROOM: ${roomCode}`}
-        score={players.find(p => p.id === playerId)?.score || 0}
-      />
+    <div className="min-h-screen bg-cyber-black p-4 md:p-8 relative crt">
+      <MatrixBackground opacity={0.05} speed={0.5} />
       
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto relative z-10">
+        <CyberHeader
+          title="LOBBY"
+          subtitle={`SERVER: ${roomCode}`}
+          score={players.find(p => p.id === playerId)?.score || 0}
+          showGlitch={true}
+        />
+        
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Players List */}
-          <PixelCard title="PLAYERS" emoji="👥" className="lg:col-span-2">
+          <CyberCard title="PLAYERS" emoji="👥" glowColor="cyan" className="lg:col-span-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {players.map((player: Player, index: number) => (
                 <div
                   key={player.id}
-                  className={`p-4 border-4 ${
+                  className={`p-4 border-2 ${
                     playerId === player.id 
-                      ? 'border-pixel-yellow bg-gray-800' 
-                      : 'border-black bg-gray-900'
+                      ? 'border-neon-yellow bg-cyber-dark/50' 
+                      : 'border-cyber-light bg-cyber-dark'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <span className="font-pixel text-gray-400">#{index + 1}</span>
-                      <span className="font-pixel text-white">{player.username}</span>
+                      <span className="font-pixel text-neon-purple">#{index + 1}</span>
+                      <span className="font-cyber text-white">{player.username}</span>
                       {isHost && player.id === playerId && (
-                        <span className="font-pixel text-xs bg-pixel-purple px-2 py-1">HOST</span>
+                        <span className="font-pixel text-xs bg-neon-pink px-2 py-1 text-black">HOST</span>
                       )}
                     </div>
-                    <span className="font-pixel text-pixel-yellow">
+                    <span className="font-pixel text-neon-yellow">
                       {player.score} PTS
                     </span>
                   </div>
                   {player.is_ready === 1 && (
-                    <div className="mt-2 font-silkscreen text-green-400 text-sm">
+                    <div className="mt-2 font-synthwave text-neon-green text-sm animate-neon-pulse">
                       ✅ READY
                     </div>
                   )}
                 </div>
               ))}
             </div>
-          </PixelCard>
+          </CyberCard>
 
           {/* Game Settings */}
-          <PixelCard title="SETTINGS" emoji="⚙️">
+          <CyberCard title="SETTINGS" emoji="⚙️" glowColor="purple">
             <div className="space-y-6">
               <div>
-                <label className="font-pixel text-gray-300 mb-2 block">CATEGORY</label>
+                <label className="font-cyber text-neon-cyan mb-2 block">CATEGORY</label>
                 <select 
                   value={selectedCategory}
                   onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full font-silkscreen bg-gray-900 border-4 border-black p-3 text-white"
+                  className="w-full font-matrix bg-cyber-black border-2 border-neon-blue p-3 text-white"
                 >
                   {GAME_CATEGORIES.map(cat => (
                     <option key={cat.id} value={cat.name}>
@@ -592,67 +628,76 @@ function App() {
               </div>
               
               <div>
-                <label className="font-pixel text-gray-300 mb-2 block">DIFFICULTY</label>
+                <label className="font-cyber text-neon-cyan mb-2 block">DIFFICULTY</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {['EASY', 'MEDIUM', 'HARD'].map(diff => (
-                    <button
-                      key={diff}
-                      className={`font-pixel p-2 border-4 ${
-                        difficulty === diff.toLowerCase()
-                          ? 'border-pixel-green bg-gray-800'
-                          : 'border-black bg-gray-900'
-                      }`}
-                      onClick={() => setDifficulty(diff.toLowerCase())}
+                  {[
+                    { text: 'EASY', color: 'green' },
+                    { text: 'MEDIUM', color: 'yellow' },
+                    { text: 'HARD', color: 'red' }
+                  ].map(diff => (
+                    <NeonButton
+                      key={diff.text}
+                      variant={diff.color as any}
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setDifficulty(diff.text.toLowerCase())}
+                      glow={difficulty === diff.text.toLowerCase()}
                     >
-                      {diff}
-                    </button>
+                      {diff.text}
+                    </NeonButton>
                   ))}
                 </div>
               </div>
               
-              <PixelProgress 
+              <NeonProgress 
                 value={players.filter(p => p.is_ready === 1).length}
                 max={players.length}
                 label="READY PLAYERS"
-                color="green"
+                color="cyan"
+                glow={true}
               />
               
-              <div className="space-y-3 pt-4 border-t-2 border-gray-700">
+              <div className="space-y-3 pt-4 border-t-2 border-cyber-light">
                 {isHost ? (
-                  <PixelButton
-                    variant="success"
+                  <NeonButton
+                    variant="green"
                     className="w-full"
                     onClick={handleStartGame}
                     disabled={players.length < 2}
                     glow={players.length >= 2}
                   >
-                    🚀 START GAME ({players.length}/8)
-                  </PixelButton>
+                    🚀 INITIATE GAME ({players.length}/8)
+                  </NeonButton>
                 ) : (
-                  <PixelButton
-                    variant="primary"
+                  <NeonButton
+                    variant="blue"
                     className="w-full"
                     onClick={handleReady}
                   >
                     ✅ READY UP
-                  </PixelButton>
+                  </NeonButton>
                 )}
                 
-                <PixelButton
-                  variant="danger"
+                <NeonButton
+                  variant="red"
                   className="w-full"
                   onClick={resetToHome}
                 >
-                  🏃 LEAVE
-                </PixelButton>
+                  🏃 DISCONNECT
+                </NeonButton>
               </div>
               {statusMessage && (
-                <div className="font-silkscreen text-green-400 text-center mt-2">
+                <div className="font-synthwave text-neon-green text-center mt-2 animate-text-flicker">
                   {statusMessage}
                 </div>
               )}
+              {errorMessage && (
+                <div className="font-pixel text-neon-red text-center animate-glitch">
+                  ⚠️ {errorMessage}
+                </div>
+              )}
             </div>
-          </PixelCard>
+          </CyberCard>
         </div>
       </div>
     </div>
@@ -660,18 +705,19 @@ function App() {
 
   // Game View
   const renderGame = () => (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <GameHeader
-        title={`ROUND ${currentRound}/${totalQuestions}`}
-        score={players.find(p => p.id === playerId)?.score || 0}
-        timeLeft={timeLeft}
-        showTimer={true}
-        lives={3}
-      />
+    <div className="min-h-screen bg-cyber-black p-4 md:p-8 relative crt">
+      <MatrixBackground opacity={0.05} speed={0.8} />
       
-      <div className="max-w-6xl mx-auto">
-        <PixelCard title="QUESTION" emoji="❓" className="mb-8">
-          <h2 className="font-pixel text-2xl text-white mb-6">
+      <div className="max-w-6xl mx-auto relative z-10">
+        <CyberHeader
+          title={`ROUND ${currentRound}/${totalQuestions}`}
+          score={players.find(p => p.id === playerId)?.score || 0}
+          timeLeft={timeLeft}
+          showGlitch={true}
+        />
+        
+        <CyberCard title="QUESTION" emoji="❓" glowColor="blue" className="mb-8">
+          <h2 className="font-cyber text-2xl text-white mb-6 animate-text-flicker">
             {currentQuestion?.question}
           </h2>
           
@@ -679,108 +725,110 @@ function App() {
             {currentQuestion?.options.map((option, index) => (
               <button
                 key={option}
-                className={`p-4 border-4 text-left transition-all ${
+                className={`p-4 border-2 text-left transition-all ${
                   selectedAnswer === index
-                    ? 'border-pixel-yellow bg-gray-800'
-                    : 'border-black bg-gray-900 hover:bg-gray-800'
+                    ? 'border-neon-yellow bg-cyber-dark/50'
+                    : 'border-cyber-light bg-cyber-dark hover:bg-cyber-gray'
                 } ${
                   feedback && index === feedback.correctAnswer
-                    ? 'border-pixel-green bg-green-900/20'
+                    ? 'border-neon-green bg-neon-green/10'
                     : ''
                 } ${
                   feedback && selectedAnswer === index && !feedback.isCorrect
-                    ? 'border-pixel-red bg-red-900/20'
+                    ? 'border-neon-red bg-neon-red/10'
                     : ''
                 }`}
                 onClick={() => handleAnswer(index)}
                 disabled={selectedAnswer !== null}
               >
                 <div className="flex items-center gap-4">
-                  <div className="font-pixel w-10 h-10 flex items-center justify-center border-2 border-black bg-gray-800">
+                  <div className="font-cyber w-10 h-10 flex items-center justify-center border-2 border-black bg-cyber-black text-neon-blue">
                     {String.fromCharCode(65 + index)}
                   </div>
-                  <span className="font-silkscreen text-white">{option}</span>
+                  <span className="font-synthwave text-white">{option}</span>
                 </div>
               </button>
             ))}
           </div>
-        </PixelCard>
+        </CyberCard>
 
         {feedback && (
-          <PixelCard 
+          <CyberCard 
             title={feedback.isCorrect ? "CORRECT! 🎉" : "INCORRECT ❌"} 
             emoji={feedback.isCorrect ? "✅" : "❌"}
-            borderColor={feedback.isCorrect ? "border-pixel-green" : "border-pixel-red"}
+            glowColor={feedback.isCorrect ? "green" : "red"}
             className="feedback-box"
           >
             <div className="space-y-4">
-              <p className="font-silkscreen text-white">
-                The correct answer was: <span className="font-pixel text-pixel-cyan">
+              <p className="font-synthwave text-white">
+                The correct answer was: <span className="font-cyber text-neon-cyan">
                   {String.fromCharCode(65 + feedback.correctAnswer)}
                 </span>
               </p>
               
               {currentQuestion?.explanation && (
-                <div className="bg-gray-800 border-2 border-black p-4">
-                  <p className="font-pixel text-pixel-yellow mb-2">💡 DID YOU KNOW?</p>
-                  <p className="font-silkscreen text-gray-300">{currentQuestion.explanation}</p>
+                <div className="bg-cyber-dark border-2 border-cyber-light p-4">
+                  <p className="font-cyber text-neon-yellow mb-2">💡 CYBER-INTEL:</p>
+                  <p className="font-matrix text-cyber-teal">{currentQuestion.explanation}</p>
                 </div>
               )}
               
-              <div className="bg-gray-800 border-2 border-black p-4">
-                <div className="font-pixel text-white space-y-2">
+              <div className="bg-cyber-dark border-2 border-cyber-light p-4">
+                <div className="font-cyber text-white space-y-2">
                   <div className="flex justify-between">
                     <span>Base points:</span>
-                    <span className="text-pixel-green">+100</span>
+                    <span className="text-neon-green">+100</span>
                   </div>
                   {feedback.speedBonus && (
                     <div className="flex justify-between">
                       <span>Speed bonus:</span>
-                      <span className="text-pixel-yellow">+50</span>
+                      <span className="text-neon-yellow">+50</span>
                     </div>
                   )}
-                  <div className="flex justify-between border-t-2 border-gray-700 pt-2">
+                  <div className="flex justify-between border-t-2 border-cyber-light pt-2">
                     <span>Total earned:</span>
-                    <span className="text-pixel-cyan">+{feedback.pointsEarned}</span>
+                    <span className="text-neon-cyan">+{feedback.pointsEarned}</span>
                   </div>
                 </div>
               </div>
               
               {isHost && currentRound < totalQuestions && (
-                <PixelButton
-                  variant="primary"
+                <NeonButton
+                  variant="pink"
                   className="w-full"
                   onClick={handleNextQuestion}
+                  glow={true}
                 >
-                  NEXT QUESTION →
-                </PixelButton>
+                  NEXT ROUND →
+                </NeonButton>
               )}
               {isHost && currentRound >= totalQuestions && (
-                <PixelButton
-                  variant="success"
+                <NeonButton
+                  variant="green"
                   className="w-full"
                   onClick={() => setView("results")}
+                  glow={true}
                 >
                   VIEW RESULTS
-                </PixelButton>
+                </NeonButton>
               )}
             </div>
-          </PixelCard>
+          </CyberCard>
         )}
 
         {!feedback && selectedAnswer !== null && (
           <div className="text-center mt-8">
-            <p className="font-silkscreen text-gray-400">
-              ✅ Answer submitted! Waiting for other players...
+            <p className="font-synthwave text-cyber-teal animate-text-flicker">
+              ✅ ANSWER UPLOADED! AWAITING OTHER PLAYERS...
             </p>
           </div>
         )}
 
-        <PixelCard title="LEADERBOARD" emoji="🏆" className="mt-8">
+        <CyberCard title="LEADERBOARD" emoji="🏆" glowColor="yellow" className="mt-8">
           <div className="space-y-2">
             {scores.length === 0 ? (
-              <p className="font-silkscreen text-gray-400 text-center py-4">
-                No scores yet
+              <p className="font-synthwave text-cyber-light text-center py-4">
+                NO DATA STREAM DETECTED
               </p>
             ) : (
               scores.map((score, idx) => (
@@ -788,36 +836,38 @@ function App() {
                   key={score.username}
                   className={`flex justify-between items-center p-3 border-2 ${
                     idx === 0
-                      ? 'border-pixel-yellow bg-yellow-900/10'
-                      : 'border-black bg-gray-800'
+                      ? 'border-neon-yellow bg-yellow-900/10'
+                      : 'border-cyber-light bg-cyber-dark'
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="font-pixel text-gray-400">#{idx + 1}</span>
-                    <span className="font-pixel text-white">{score.username}</span>
+                    <span className="font-pixel text-cyber-light">#{idx + 1}</span>
+                    <span className="font-cyber text-white">{score.username}</span>
                     {score.username === username && (
-                      <span className="font-pixel text-xs bg-pixel-purple px-2 py-1">YOU</span>
+                      <span className="font-pixel text-xs bg-neon-pink px-2 py-1 text-black">YOU</span>
                     )}
                   </div>
-                  <span className="font-pixel text-pixel-yellow">
+                  <span className="font-pixel text-neon-yellow">
                     {score.score} PTS
                   </span>
                 </div>
               ))
             )}
           </div>
-        </PixelCard>
+        </CyberCard>
       </div>
     </div>
   );
 
   // Results View
   const renderResults = () => (
-    <div className="min-h-screen bg-gray-900 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <PixelCard title="GAME OVER!" emoji="🏆" glow={true} className="text-center">
-          <h1 className="font-pixel text-4xl text-white mb-6">
-            🎉 FINAL RESULTS 🎉
+    <div className="min-h-screen bg-cyber-black p-4 md:p-8 relative crt">
+      <MatrixBackground opacity={0.05} speed={0.3} />
+      
+      <div className="max-w-4xl mx-auto relative z-10">
+        <CyberCard title="MISSION COMPLETE!" emoji="🏆" glowColor="pink" hologram={true} className="text-center">
+          <h1 className="font-cyber text-4xl text-white mb-6 animate-neon-pulse">
+            🎉 CYBER-VICTORY! 🎉
           </h1>
           
           <div className="space-y-8">
@@ -827,19 +877,19 @@ function App() {
                   key={entry.username}
                   className={`p-6 border-4 ${
                     idx === 0
-                      ? 'border-pixel-yellow bg-yellow-900/20'
+                      ? 'border-neon-yellow bg-yellow-900/20'
                       : idx === 1
-                      ? 'border-gray-400 bg-gray-800'
-                      : 'border-amber-700 bg-amber-900/20'
+                      ? 'border-cyber-light bg-cyber-dark'
+                      : 'border-neon-orange bg-orange-900/20'
                   }`}
                 >
-                  <div className="font-pixel text-5xl mb-4">
+                  <div className="font-cyber text-5xl mb-4">
                     {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
                   </div>
-                  <div className="font-pixel text-xl text-white mb-2">
+                  <div className="font-cyber text-xl text-white mb-2">
                     {entry.username}
                   </div>
-                  <div className="font-pixel text-3xl text-pixel-yellow">
+                  <div className="font-cyber text-3xl text-neon-yellow">
                     {entry.score} PTS
                   </div>
                 </div>
@@ -847,19 +897,19 @@ function App() {
             </div>
 
             {leaderboard.length > 3 && (
-              <div className="bg-gray-800 border-4 border-black p-6">
-                <h3 className="font-pixel text-white mb-4">OTHER PLAYERS</h3>
+              <div className="bg-cyber-dark border-4 border-cyber-light p-6">
+                <h3 className="font-cyber text-white mb-4">OTHER OPERATIVES</h3>
                 <div className="space-y-2">
                   {leaderboard.slice(3).map((entry, idx) => (
                     <div
                       key={entry.username}
-                      className="flex justify-between items-center p-3 bg-gray-900 border-2 border-black"
+                      className="flex justify-between items-center p-3 bg-cyber-black border-2 border-cyber-light"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-pixel text-gray-400">#{idx + 4}</span>
-                        <span className="font-pixel text-white">{entry.username}</span>
+                        <span className="font-pixel text-cyber-light">#{idx + 4}</span>
+                        <span className="font-cyber text-white">{entry.username}</span>
                       </div>
-                      <span className="font-pixel text-pixel-yellow">
+                      <span className="font-pixel text-neon-yellow">
                         {entry.score} PTS
                       </span>
                     </div>
@@ -868,16 +918,17 @@ function App() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t-2 border-gray-700">
-              <PixelButton
-                variant="primary"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-6 border-t-2 border-cyber-light">
+              <NeonButton
+                variant="blue"
                 className="w-full"
                 onClick={resetToHome}
+                glow={true}
               >
-                🏠 BACK TO HOME
-              </PixelButton>
-              <PixelButton
-                variant="secondary"
+                🏠 RETURN TO HUB
+              </NeonButton>
+              <NeonButton
+                variant="green"
                 className="w-full"
                 onClick={() => {
                   if (isHost) {
@@ -886,22 +937,23 @@ function App() {
                     setView("lobby");
                   }
                 }}
+                glow={true}
               >
-                🔄 PLAY AGAIN
-              </PixelButton>
+                🔄 RESTART SIMULATION
+              </NeonButton>
             </div>
           </div>
-        </PixelCard>
+        </CyberCard>
       </div>
     </div>
   );
 
   // Audio Control Component
   const renderAudioControls = () => (
-    <div className="fixed bottom-4 right-4 z-50 flex gap-2 bg-gray-900 border-4 border-black p-3">
+    <div className="fixed bottom-4 right-4 z-50 flex gap-2 bg-cyber-dark/90 border-2 border-neon-blue p-3 backdrop-blur-sm">
       <button 
         className={`w-10 h-10 flex items-center justify-center border-2 border-black ${
-          !audioManager.isEnabled() ? 'bg-gray-700' : 'bg-pixel-purple'
+          !audioManager.isEnabled() ? 'bg-cyber-gray' : 'bg-neon-purple'
         }`}
         onClick={() => audioManager.setEnabled(!audioManager.isEnabled())}
         title={audioManager.isEnabled() ? 'Mute sounds' : 'Unmute sounds'}
@@ -916,7 +968,7 @@ function App() {
         max="100" 
         value={audioManager.getVolume() * 100}
         onChange={(e) => audioManager.setVolume(Number(e.target.value) / 100)}
-        className="w-24"
+        className="w-24 accent-neon-blue"
         title="Volume"
       />
     </div>
@@ -924,18 +976,6 @@ function App() {
 
   return (
     <>
-      <svg style={{ display: 'none' }} width="0" height="0">
-        <defs>
-          <linearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#6366f1" />
-            <stop offset="100%" stopColor="#22d3ee" />
-          </linearGradient>
-          <linearGradient id="timerWarningGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#eab308" />
-            <stop offset="100%" stopColor="#f87171" />
-          </linearGradient>
-        </defs>
-      </svg>
       <main className="app">
         {view === "home" && renderHome()}
         {view === "lobby" && renderLobby()}
