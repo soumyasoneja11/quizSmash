@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@theme {
+  --font-orbitron: "Orbitron", sans-serif;
+
+  /* 1. ORIGINAL GLITCH HEADING ANIMATION */
+  @keyframes glitch-original {
+    0% { transform: translate(0); text-shadow: 2px 2px #22d3ee; }
+    20% { transform: translate(-3px, 2px); text-shadow: -2px -2px #d946ef, 3px 0 #22d3ee; }
+    40% { transform: translate(3px, -2px); text-shadow: 3px -2px #d946ef, -3px 2px #22d3ee; }
+    60% { transform: translate(-3px, 0); text-shadow: -3px 0 #d946ef; }
+    100% { transform: translate(0); text-shadow: 2px 2px #22d3ee; }
+  }
+
+  /* 2. MAIN LARGE BOX CONTINUOUS NEON GLOW */
+  @keyframes main-box-glow {
+    0%, 100% { 
+      box-shadow: 0 0 20px rgba(34, 211, 238, 0.3), inset 0 0 15px rgba(34, 211, 238, 0.1); 
+      border-color: rgba(34, 211, 238, 0.5);
+    }
+    50% { 
+      box-shadow: 0 0 40px rgba(217, 70, 239, 0.4), inset 0 0 20px rgba(217, 70, 239, 0.2); 
+      border-color: rgba(217, 70, 239, 0.6);
+    }
+  }
+
+  /* 3. BACK-AND-FORTH SCANNING LINE */
+  @keyframes scan-move {
+    0% { left: -100%; }
+    100% { left: 100%; }
+  }
+
+  /* 4. 3D GRID FLOOR (PPT VIBE) */
+  @keyframes grid-move {
+    0% { transform: perspective(500px) rotateX(60deg) translateY(0); }
+    100% { transform: perspective(500px) rotateX(60deg) translateY(50px); }
+  }
+}
+
+/* --- UTILITY CLASSES --- */
+
+.animate-glitch-original {
+  animation: glitch-original 2s infinite;
+}
+
+.main-login-card {
+  animation: main-box-glow 4s infinite ease-in-out;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(20px);
+}
+
+.perspective-grid {
+  background-image: 
+    linear-gradient(to right, rgba(34,211,238,0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34,211,238,0.2) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: grid-move 2s linear infinite;
+}
+
+/* --- NEON INPUT BOXES --- */
+.neon-box {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Hover Pop-up Effect */
+.neon-box:hover {
+  transform: translateY(-8px) scale(1.02);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Neon Lines inside boxes */
+.neon-line {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  animation: scan-move 1.5s linear infinite;
+}
+
+.line-blue {
+  background: linear-gradient(90deg, transparent, #00f2ff, transparent);
+  box-shadow: 0 0 15px #00f2ff;
+}
+
+.line-pink {
+  background: linear-gradient(90deg, transparent, #ff00ff, transparent);
+  box-shadow: 0 0 15px #ff00ff;
+}
+
+/* General Layout */
+body {
+  margin: 0;
+  background-color: #010103;
+  color: white;
+  overflow: hidden;
+}

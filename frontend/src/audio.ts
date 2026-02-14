@@ -1,232 +1,103 @@
-/**
- * Audio Management System for QuizSmash
- * Handles all game sounds and audio feedback
- */
+// src/audio.ts
 
-export type SoundType = 'correct' | 'incorrect' | 'timer-warn' | 'timer-end' | 'join' | 'victory' | 'round-start';
-
-interface AudioConfig {
-  volume: number;
-  enabled: boolean;
-}
+type SoundType = 
+  | 'join' 
+  | 'leave' 
+  | 'correct' 
+  | 'incorrect' 
+  | 'timer-warn' 
+  | 'timer-end' 
+  | 'round-start' 
+  | 'victory'
+  | 'cyber-beep'
+  | 'laser'
+  | 'power-up'
+  | 'error';
 
 class AudioManager {
-  private audioContext: AudioContext | null = null;
-  private config: AudioConfig = {
-    volume: 0.7,
-    enabled: true,
-  };
+  private enabled = true;
+  private volume = 0.7;
+  private sounds: Map<SoundType, HTMLAudioElement> = new Map();
+  private bgm: HTMLAudioElement | null = null;
 
   constructor() {
-    this.initAudioContext();
+    // Preload cyberpunk sound effects
+    this.preloadSounds();
   }
 
-  private initAudioContext() {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioContext = new AudioContextClass();
-    } catch (e) {
-      console.warn('Web Audio API not supported:', e);
-    }
-  }
+  private preloadSounds() {
+    const soundSources: Record<SoundType, string> = {
+      'join': 'https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3',
+      'leave': 'https://assets.mixkit.co/sfx/preview/mixkit-retro-game-emergency-alarm-1000.mp3',
+      'correct': 'https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3',
+      'incorrect': 'https://assets.mixkit.co/sfx/preview/mixkit-wrong-answer-fail-notification-946.mp3',
+      'timer-warn': 'https://assets.mixkit.co/sfx/preview/mixkit-sci-fi-alarm-905.mp3',
+      'timer-end': 'https://assets.mixkit.co/sfx/preview/mixkit-retro-arcade-game-over-470.mp3',
+      'round-start': 'https://assets.mixkit.co/sfx/preview/mixkit-game-show-intro-331.mp3',
+      'victory': 'https://assets.mixkit.co/sfx/preview/mixkit-winning-notification-2018.mp3',
+      'cyber-beep': 'https://assets.mixkit.co/sfx/preview/mixkit-unlock-game-notification-253.mp3',
+      'laser': 'https://assets.mixkit.co/sfx/preview/mixkit-laser-weapon-shot-1671.mp3',
+      'power-up': 'https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3',
+      'error': 'https://assets.mixkit.co/sfx/preview/mixkit-warning-alarm-buzzer-958.mp3',
+    };
 
-  /**
-   * Generate a simple beep/tone using Web Audio API
-   */
-  private generateTone(
-    frequency: number,
-    duration: number,
-    type: OscillatorType = 'sine'
-  ): Promise<void> {
-    return new Promise((resolve) => {
-      if (!this.audioContext || !this.config.enabled) {
-        resolve();
-        return;
-      }
-
-      try {
-        const now = this.audioContext.currentTime;
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-
-        oscillator.frequency.value = frequency;
-        oscillator.type = type;
-
-        gainNode.gain.setValueAtTime(this.config.volume, now);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
-
-        oscillator.start(now);
-        oscillator.stop(now + duration);
-
-        setTimeout(resolve, duration * 1000);
-      } catch (e) {
-        console.warn('Error generating tone:', e);
-        resolve();
-      }
+    Object.entries(soundSources).forEach(([type, src]) => {
+      const audio = new Audio(src);
+      audio.preload = 'auto';
+      this.sounds.set(type as SoundType, audio);
     });
   }
 
-  /**
-   * Play a correct answer sound (ascending tones)
-   */
-  async playCorrect(): Promise<void> {
-    if (!this.config.enabled) return;
-    
-    const tones = [
-      { freq: 523.25, dur: 0.1 }, // C5
-      { freq: 659.25, dur: 0.1 }, // E5
-      { freq: 783.99, dur: 0.2 }, // G5
-    ];
+  async playSound(type: SoundType) {
+    if (!this.enabled) return;
 
-    for (const tone of tones) {
-      await this.generateTone(tone.freq, tone.dur, 'sine');
+    try {
+      const sound = this.sounds.get(type);
+      if (sound) {
+        sound.currentTime = 0;
+        sound.volume = this.volume;
+        await sound.play();
+      }
+    } catch (error) {
+      console.warn('Failed to play sound:', error);
     }
   }
 
-  /**
-   * Play an incorrect answer sound (descending tones)
-   */
-  async playIncorrect(): Promise<void> {
-    if (!this.config.enabled) return;
-
-    const tones = [
-      { freq: 349.23, dur: 0.15 }, // F4
-      { freq: 293.66, dur: 0.15 }, // D4
-      { freq: 246.94, dur: 0.3 },  // B3
-    ];
-
-    for (const tone of tones) {
-      await this.generateTone(tone.freq, tone.dur, 'sine');
+  playBGM() {
+    if (this.bgm) {
+      this.bgm.loop = true;
+      this.bgm.volume = this.volume * 0.3;
+      this.bgm.play();
     }
   }
 
-  /**
-   * Play timer warning sound (rapid beeps)
-   */
-  async playTimerWarning(): Promise<void> {
-    if (!this.config.enabled) return;
-
-    for (let i = 0; i < 2; i++) {
-      await this.generateTone(880, 0.1, 'square');
-      await new Promise(r => setTimeout(r, 50));
+  stopBGM() {
+    if (this.bgm) {
+      this.bgm.pause();
+      this.bgm.currentTime = 0;
     }
   }
 
-  /**
-   * Play timer end sound (low tone)
-   */
-  async playTimerEnd(): Promise<void> {
-    if (!this.config.enabled) return;
-    await this.generateTone(200, 0.3, 'sine');
-  }
-
-  /**
-   * Play player join sound
-   */
-  async playJoin(): Promise<void> {
-    if (!this.config.enabled) return;
-    
-    const tones = [
-      { freq: 440, dur: 0.1 },
-      { freq: 554.37, dur: 0.15 },
-    ];
-
-    for (const tone of tones) {
-      await this.generateTone(tone.freq, tone.dur, 'sine');
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (!enabled) {
+      this.stopBGM();
     }
   }
 
-  /**
-   * Play victory/celebration sound (triumphant chord)
-   */
-  async playVictory(): Promise<void> {
-    if (!this.config.enabled) return;
-
-    // Play three tones simultaneously by overlapping
-    const promises = [
-      this.generateTone(523.25, 0.5, 'sine'),  // C5
-      this.generateTone(659.25, 0.5, 'sine'),  // E5
-      this.generateTone(783.99, 0.5, 'sine'),  // G5
-    ];
-
-    await Promise.all(promises);
-  }
-
-  /**
-   * Play round start fanfare
-   */
-  async playRoundStart(): Promise<void> {
-    if (!this.config.enabled) return;
-
-    const tones = [
-      { freq: 440, dur: 0.1 },
-      { freq: 554.37, dur: 0.1 },
-      { freq: 659.25, dur: 0.2 },
-    ];
-
-    for (const tone of tones) {
-      await this.generateTone(tone.freq, tone.dur, 'sine');
+  setVolume(volume: number) {
+    this.volume = Math.max(0, Math.min(1, volume));
+    if (this.bgm) {
+      this.bgm.volume = this.volume * 0.3;
     }
   }
 
-  /**
-   * Play a sound by type
-   */
-  async playSound(type: SoundType): Promise<void> {
-    switch (type) {
-      case 'correct':
-        await this.playCorrect();
-        break;
-      case 'incorrect':
-        await this.playIncorrect();
-        break;
-      case 'timer-warn':
-        await this.playTimerWarning();
-        break;
-      case 'timer-end':
-        await this.playTimerEnd();
-        break;
-      case 'join':
-        await this.playJoin();
-        break;
-      case 'victory':
-        await this.playVictory();
-        break;
-      case 'round-start':
-        await this.playRoundStart();
-        break;
-    }
+  getVolume() {
+    return this.volume;
   }
 
-  /**
-   * Set master volume (0-1)
-   */
-  setVolume(volume: number): void {
-    this.config.volume = Math.max(0, Math.min(1, volume));
-  }
-
-  /**
-   * Get current volume
-   */
-  getVolume(): number {
-    return this.config.volume;
-  }
-
-  /**
-   * Enable/disable all sounds
-   */
-  setEnabled(enabled: boolean): void {
-    this.config.enabled = enabled;
-  }
-
-  /**
-   * Check if sounds are enabled
-   */
-  isEnabled(): boolean {
-    return this.config.enabled;
+  isEnabled() {
+    return this.enabled;
   }
 }
 

@@ -1,11 +1,20 @@
 const OpenAI = require('openai');
 require('dotenv').config();
 
-const openai = new OpenAI({
+// Check if OpenAI API key exists
+const hasOpenAIKey = process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== '';
+
+const openai = hasOpenAIKey ? new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}) : null;
 
 async function generateQuiz(topic, difficulty = 'medium', numQuestions = 3) {
+  // If no OpenAI API key, use fallback questions
+  if (!hasOpenAIKey) {
+    console.log('⚠️ No OpenAI API key found, using fallback questions');
+    return getFallbackQuestions(topic, numQuestions);
+  }
+
   try {
     const prompt = `Generate ${numQuestions} multiple-choice quiz questions about "${topic}".
     Difficulty level: ${difficulty}.

@@ -1,20 +1,27 @@
 {
-  "name": "backend",
+  "name": "quizsmash-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "QuizSmash Backend Server with PostgreSQL",
+  "main": "src/index.js",
+  
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node src/index.js"
+    "dev": "node src/index.js",
+    "setup-db": "node src/setup-db.js",
+    "reset-db": "node src/reset-db.js",
+    "clean-db": "node src/clean-db.js",
+    "test-db": "node src/test-db.js"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "openai": "^6.17.0",
+    "pg": "^8.18.0",
+    "pg-hstore": "^2.3.4",
     "socket.io": "^4.8.3",
     "sqlite3": "^5.1.7"
   }
